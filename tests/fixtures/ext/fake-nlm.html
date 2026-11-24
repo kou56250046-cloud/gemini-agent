@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>ダミーの NotebookLM（拡張の試験用）</title></head>
+<body>
+<!-- 拡張の試験用。NotebookLM の質問欄と回答だけを真似る。通信はしない -->
+<div id="chat"></div>
+<textarea class="query-box-input" aria-label="クエリボックス"></textarea>
+<button class="submit-button" type="button" aria-label="送信">送信</button>
+<script>
+document.querySelector(".submit-button").addEventListener("click", () => {
+  const q = document.querySelector(".query-box-input");
+  const t = q.value; q.value = "";
+  setTimeout(() => {
+    const c = document.createElement("div"); c.className = "to-user-container";
+    const m = document.createElement("div"); m.className = "message-text-content";
+    const p = document.createElement("p"); p.textContent = /締め日/.test(t) ? "締め日は月末です（ダミー）" : "資料にありません";
+    const s = document.createElement("sup"); s.textContent = "1"; p.append(s);
+    m.append(p); c.append(m); document.getElementById("chat").append(c);
+  }, 300);
+});
+</script>
+</body>
+</html>

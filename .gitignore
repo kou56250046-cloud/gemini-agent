@@ -1,0 +1,8 @@
+# 配布物（output/gemini-agent.html・output/extension/）は入れる。確認用の画像と試験版の拡張は入れない
+output/shots/
+output/extension-test/
+output/*.tmp
+*.tmp
+.playwright-mcp/
+node_modules/
+.env*

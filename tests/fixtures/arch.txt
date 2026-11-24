@@ -1,0 +1,25 @@
+title 受注システムの構成（ダミー）
+layer 利用者
+layer 画面
+layer 業務処理
+layer データ
+layer 外部
+node U @利用者 営業担当 [person]
+node C @利用者 取引先 [person]
+node W @画面 受注画面
+node P @画面 取引先ポータル
+node A @業務処理 受注API
+node B @業務処理 夜間バッチ
+node D @データ 受注DB [db]
+node M @データ 商品マスタ [db]
+node X @外部 基幹システム [ext]
+group 社内ネットワーク : W, A, B, D, M
+U -> W : ブラウザ
+C -> P : ブラウザ
+W -> A : HTTPS
+P -> A : HTTPS
+A -> D
+A -> M
+B -> D
+B ..> X : 毎晩 2 時
+note A 入力チェックと在庫の引当

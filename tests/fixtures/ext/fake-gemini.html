@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ダミーの Gemini（拡張の試験用）</title>
+<style>body{font-family:sans-serif;margin:20px} .ql-editor{border:1px solid #999;min-height:40px;padding:6px} model-response{display:block;border-top:1px solid #ccc;margin:8px 0;padding:8px}</style>
+</head>
+<body>
+<!-- 拡張の試験用。Gemini の画面の作り（入力欄・送信ボタン・応答・コードブロック）だけを真似て、台本どおりに返す。通信はしない -->
+<div id="chat"></div>
+<rich-textarea><div class="ql-editor" contenteditable="true" role="textbox"></div></rich-textarea>
+<button class="send-button" aria-label="プロンプトを送信" type="button">送信</button>
+<script>
+(function () {
+  "use strict";
+  const editor = document.querySelector(".ql-editor");
+  const chat = document.getElementById("chat");
+  window.__sent = [];
+  const tool = (name, args) => ({ code: "tool", text: JSON.stringify({ tool: name, args }) });
+  function script(t) {
+    if (t.includes("【gemini-agent 拡張")) return [{ p: "【段階 1/7｜WBS｜待ってください】" }, { p: "まず資料を見ます。" }, tool("list_dir", {})];
+    if (t.startsWith("【ツール結果｜list_dir｜成功】")) return [{ p: "議事録を読みます。" }, tool("read_file", { path: "資料/議事録.txt" })];
+    if (t.startsWith("【ツール結果｜read_file｜成功】") && t.includes("締め日")) return [{ p: "工数を計算します。" }, tool("run_js", { code: "return input.a * input.b", input: { a: 6, b: 7 } })];
+    if (t.startsWith("【ツール結果｜run_js｜成功】") && t.includes("42")) return [{ p: "【段階 3/7｜WBS｜仕様を読んで「承認」か直す点を返してください】" }, { h: "仕様" }, { p: "背景：受注の見直し（ダミー）。非目標：請求は扱わない。" }];
+    if (t.includes("承認")) return [
+      { p: "【段階 4/7｜WBS｜WBS と論点を確かめてください】" },
+      { code: "Map", text: "title 論点（ダミー）\n受注を速くする\n- 入力を減らす [課題]\n  - ポータル [案] [推奨]" },
+      { code: "wbs", text: "| ID | 階層 | 作業 | 成果物 | 工数(h) | 依存 | 担当 | 開始 | 終了 |\n|---|---|---|---|---|---|---|---|---|\n| 1 | 1 | 聞き取り | 議事録 | 16 |  | 担当A | 2026-12-01 |  |\n| 2 | 1 | 整理 | 要件一覧 | 24 | 1 | 担当A |  |  |" },
+      { code: "memo", text: "F-01 受注は月 300 件（ダミー）\nD-01 ポータルで入力してもらう\nQ-01 締め日は？（決める人：営業部長／期限：2026-12-05）" },
+      tool("write_file", { path: "out/メモ.md", content: "# メモ（ダミー）\n" }),
+    ];
+    if (t.startsWith("【ツール結果｜write_file｜成功】")) return [{ p: "NotebookLM に聞きます。" }, tool("ask_notebooklm", { question: "締め日は？" })];
+    if (t.startsWith("【ツール結果｜ask_notebooklm｜成功】") && t.includes("月末")) return [{ code: "memo", text: "Q-01 回答済：月末" }, tool("done", { summary: "ダミーの案件を最後まで進めました" })];
+    return [{ p: "（台本にない入力です）" }];
+  }
+  function render(parts) {
+    const resp = document.createElement("model-response");
+    const mc = document.createElement("message-content");
+    const md = document.createElement("div");
+    md.className = "markdown";
+    for (const x of parts) {
+      if (x.p) { const p = document.createElement("p"); p.textContent = x.p; md.append(p); }
+      if (x.h) { const h = document.createElement("h2"); h.textContent = x.h; md.append(h); }
+      if (x.code) {
+        const cb = document.createElement("code-block");
+        const dec = document.createElement("div"); dec.className = "code-block-decoration";
+        const sp = document.createElement("span"); sp.textContent = x.code; dec.append(sp);
+        const pre = document.createElement("pre"); const code = document.createElement("code"); code.textContent = x.text; pre.append(code);
+        const btn = document.createElement("button"); btn.textContent = "コピー";
+        cb.append(dec, btn, pre); md.append(cb);
+      }
+    }
+    mc.append(md); resp.append(mc);
+    return resp;
+  }
+  document.querySelector(".send-button").addEventListener("click", () => {
+    const t = editor.innerText.trim();
+    if (!t) return;
+    window.__sent.push(t);
+    editor.textContent = "";
+    const stop = document.createElement("button");
+    stop.setAttribute("aria-label", "回答を停止"); stop.textContent = "停止";
+    document.body.append(stop);
+    setTimeout(() => chat.append(render(script(t))), 300);
+    setTimeout(() => stop.remove(), 700);
+  });
+})();
+</script>
+</body>
+</html>

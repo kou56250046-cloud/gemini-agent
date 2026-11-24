@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini エージェント",
+  "version": "0.1.0",
+  "description": "Gemini と NotebookLM の画面をつなぎ、案件を段階を踏んで進める（社内用・通信しない）",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://gemini.google.com/*",
+    "https://notebooklm.google.com/*"
+  ],
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "action": {
+    "default_title": "Gemini エージェント"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "domtomd.js",
+        "content-gemini.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://notebooklm.google.com/*"
+      ],
+      "js": [
+        "domtomd.js",
+        "content-nlm.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "sandbox": {
+    "pages": [
+      "sandbox.html"
+    ]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'none'; frame-src 'self'",
+    "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-eval' blob:; worker-src blob:; connect-src 'none'"
+  }
+}

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gemini エージェント</title>
+<style>
+/* 色は gemini-kit（デジタル庁デザインシステムの配色）にそろえる */
+:root {
+  --d-text: #000000; --d-label: #626264; --d-bg: #F8F8FB; --d-card: #FFFFFF; --d-line: #CCCCCC;
+  --d-s1: #0017C1; --d-s2: #000060; --d-s3: #3460FB; --d-s4: #A58000; --d-hl: #E8F1FE; --d-neg-text: #CE0000;
+  --font: Arial, "メイリオ", Meiryo, "Yu Gothic", sans-serif;
+  --navy: var(--d-s1); --navy2: var(--d-s3); --gold: var(--d-s4); --ink: var(--d-text); --sub: var(--d-label);
+  --line: var(--d-line); --bg: var(--d-bg); --panel: var(--d-card); --ok: #1A6B35; --warn: #8A5A00; --err: var(--d-neg-text);
+  --head: var(--d-s2); --head-h: 81px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); font-size: 14px; line-height: 1.6; }
+header.top { background: var(--head); color: #fff; position: sticky; top: 0; z-index: 10; }
+header.top .top-in { max-width: 1600px; margin: 0 auto; padding: 0 20px; display: flex; flex-wrap: wrap; align-items: center; column-gap: 24px; min-height: 40px; }
+header.top h1 { font-size: 16px; margin: 0; white-space: nowrap; letter-spacing: .02em; }
+header.top h1 small { color: #C9D4E3; font-weight: normal; margin-left: 8px; font-size: 12px; }
+nav.tabs { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px; border-top: 1px solid rgba(255,255,255,.12); }
+nav.tabs button { background: none; border: 0; border-radius: 0; color: #C9D4E3; font: inherit; padding: 0 14px; min-height: 40px; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+nav.tabs button:hover { color: #fff; }
+nav.tabs button.on { color: #fff; border-bottom-color: var(--gold); font-weight: bold; }
+main { padding: 20px; max-width: 1600px; margin: 0 auto; }
+section.tab[hidden] { display: none; }
+h2 { font-size: 18px; margin: 0 0 4px; color: var(--navy); }
+h3 { font-size: 15px; color: var(--navy); margin: 22px 0 8px; }
+.muted { color: var(--sub); }
+.small { font-size: 12px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+button:hover { border-color: var(--navy2); }
+button.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+button.primary:hover { background: var(--navy2); }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+textarea { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: #fff; }
+.mono { font-family: Consolas, "BIZ UDGothic", "MS Gothic", monospace; font-size: 13px; line-height: 1.5; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.tablewrap { overflow-x: auto; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 8px; opacity: 0; transition: .2s; pointer-events: none; z-index: 100; max-width: 90vw; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.err { background: var(--err); }
+ul.msgs { list-style: none; padding: 0; margin: 8px 0; font-size: 13px; }
+ul.msgs li { padding: 3px 8px; border-left: 3px solid var(--line); margin-bottom: 3px; background: #fff; }
+li.err, .err { color: var(--err); border-color: var(--err); }
+li.warn, .warn { color: var(--warn); border-color: var(--warn); }
+li.ok { color: var(--ok); border-color: var(--ok); }
+.help table, .md table, table.grid { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; }
+.help th, .help td, .md th, .md td, table.grid th, table.grid td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.help th, .md th, table.grid th { background: #EEF2F7; color: var(--navy); white-space: nowrap; }
+.md { line-height: 1.75; }
+.md h1 { font-size: 20px; color: var(--navy); border-bottom: 2px solid var(--navy); margin: 8px 0 12px; }
+.md h2 { font-size: 17px; border-left: 4px solid var(--gold); padding-left: 8px; margin: 20px 0 8px; }
+.md h3 { font-size: 15px; margin: 16px 0 6px; }
+.md pre { background: #F3F5F8; border: 1px solid var(--line); padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+.md code { background: #F0F2F5; padding: 0 4px; border-radius: 3px; font-family: Consolas, monospace; font-size: 12.5px; }
+.md pre code { background: none; padding: 0; }
+.md li.nested { margin-left: 20px; list-style: circle; }
+.md .cb { margin-right: 6px; color: var(--navy); }
+.md table { margin: 8px 0; }
+.md blockquote { border-left: 3px solid var(--line); margin: 6px 0; padding-left: 10px; color: var(--sub); }
+.md .fig { overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: #fff; }
+.md .fig svg { max-width: 100%; height: auto; }
+.fig { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 12px 0 18px; }
+
+/* 入力と表示の 2 列（文書・フロー図・スライド・表） */
+.work { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.work .src { position: sticky; top: calc(var(--head-h) + 20px); display: flex; flex-direction: column; gap: 8px; }
+.work .src textarea { height: calc(100vh - 330px); min-height: 260px; }
+.view { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; min-height: 200px; overflow: auto; }
+#flow-view svg, #wbs-view svg { display: block; max-width: none; }
+#explain-view { padding: 0; overflow: hidden; }
+#explain-view iframe { display: block; width: 100%; height: calc(100vh - 160px); min-height: 480px; border: 0; }
+select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: #fff; min-height: 36px; }
+.ik-k-wbs.ik-chip { background: #E6F2EC; } .ik-k-arch.ik-chip, .ik-k-map.ik-chip { background: #E8F1FE; } .ik-k-explain.ik-chip { background: #FFF1D6; }
+#deck-view { display: flex; flex-direction: column; gap: 6px; background: none; border: 0; padding: 0; }
+.slide-cap { font-size: 12px; color: var(--sub); margin-top: 10px; }
+.slide-wrap { width: 100%; overflow: hidden; position: relative; box-shadow: 0 1px 4px rgba(0,0,0,.15); background: #fff; }
+.slide { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; overflow: hidden; font-family: var(--font); }
+.slide .el { position: absolute; }
+.slide .txt { display: flex; flex-direction: column; overflow: visible; white-space: pre-wrap; word-break: break-all; line-break: strict; }
+.slide .txt.v-ctr { justify-content: center; }
+.slide .txt.v-b { justify-content: flex-end; }
+.slide .txt.overflow { outline: 2px dashed var(--err); }
+.slide .p .bu { display: inline-block; text-indent: 0; }
+
+/* 取り込みタブ */
+#intake-src { min-height: 160px; }
+.ik-head { margin: 12px 0; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--d-s1); border-radius: 8px; }
+.ik-stage { display: flex; gap: 10px; align-items: baseline; }
+.ik-type { font-size: 12px; padding: 1px 8px; border-radius: 9px; background: var(--d-hl); color: var(--d-s2); }
+.ik-bar { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; padding: 0; margin: 8px 0; font-size: 12px; }
+.ik-bar li { padding: 2px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--sub); background: #fff; }
+.ik-bar li.done { background: var(--d-hl); color: var(--d-s2); }
+.ik-bar li.now { background: var(--d-s2); color: #fff; border-color: var(--d-s2); font-weight: bold; }
+.ik-next { margin: 4px 0 0; }
+.ik-sum { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; font-size: 13px; }
+.ik-chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 9px; border: 1px solid var(--line); background: #fff; white-space: nowrap; }
+.ik-k-doc.ik-chip { background: #E8EDF4; } .ik-k-flow.ik-chip { background: #E6F2EC; } .ik-k-slides.ik-chip { background: #FFF1D6; }
+.ik-k-table.ik-chip { background: #EEE8F6; } .ik-k-karte.ik-chip { background: #FCEBD2; } .ik-k-code.ik-chip { background: #F1F3F6; }
+.ik-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.ik-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.ik-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.ik-body { margin: 6px 0 10px; }
+.ik-fig { overflow: auto; max-height: 420px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+.ik-fig svg { max-width: 100%; height: auto; }
+.ik-md { max-height: 420px; overflow: auto; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; }
+/* エージェント（拡張のサイドパネル） */
+.ag-status { margin-top: 8px; }
+.ag-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 8px; }
+.ag-cols h4 { margin: 0 0 4px; font-size: 13px; color: var(--navy); }
+.ag-list { margin: 0; padding-left: 1.2em; font-size: 12.5px; }
+.ag-list li.err { color: var(--err); }
+.ag-folder { font-size: 13px; }
+.ag-busy { margin: 6px 0; padding: 6px 10px; background: var(--d-hl); border-radius: 6px; font-size: 13px; }
+.ag-gate { margin: 10px 0; padding: 12px 14px; background: #FFF8E8; border: 1px solid #E5C77F; border-left: 4px solid var(--gold); border-radius: 8px; }
+.ag-gate-h { margin: 0 0 4px; font-weight: bold; color: #6E4B00; }
+.ag-approve { background: #FDF1F0; border-color: #E9B4AE; border-left-color: var(--err); }
+.ag-log li { font-size: 12px; }
+.ag-settings { margin-top: 14px; }
+.ag-set { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; font-size: 12.5px; }
+.ag-set input[type=text], .ag-set input[type=number] { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+button.danger { color: var(--err); }
+.ik-code { max-height: 260px; overflow: auto; background: #F3F5F8; padding: 8px; border-radius: 6px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre; }
+
+/* Gem 設定 */
+.gem-list { display: grid; gap: 12px; }
+.gem-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.gem-card h3 { margin: 0 0 4px; }
+.gem-card pre { max-height: 320px; overflow: auto; background: #F3F5F8; padding: 10px; border-radius: 6px; white-space: pre-wrap; font: 12.5px/1.6 Consolas, "メイリオ", monospace; }
+.kn { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.help { max-width: 1100px; }
+.help .lead { font-size: 15px; }
+.help ol li { margin-bottom: 4px; }
+#help-flow svg { display: block; width: 100%; height: auto; min-width: 960px; }
+
+/* サイドパネル（幅 520px 以下）：上のバーを固定せず、タブを小さくして作業の場所を広く取る */
+@media (max-width: 520px) {
+  header.top { position: static; }
+  header.top .top-in { padding: 0 10px; }
+  header.top h1 small { display: none; }
+  nav.tabs button { padding: 0 9px; min-height: 34px; font-size: 13px; }
+  main { padding: 12px 10px; }
+}
+@media (max-width: 860px) {
+  .work { grid-template-columns: 1fr; }
+  .work .src { position: static; }
+  .work .src textarea { height: 220px; min-height: 0; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <h1>Gemini エージェント<small>オフラインで動作・外部送信なし</small></h1>
+  <nav class="tabs" role="tablist" aria-label="機能">
+    <button data-tab="agent" role="tab" id="tabbtn-agent" aria-controls="tab-agent" data-ext-only>エージェント</button>
+    <button data-tab="intake" role="tab" id="tabbtn-intake" aria-controls="tab-intake">取り込み</button>
+    <button data-tab="doc" role="tab" id="tabbtn-doc" aria-controls="tab-doc">文書</button>
+    <button data-tab="flow" role="tab" id="tabbtn-flow" aria-controls="tab-flow">図</button>
+    <button data-tab="slides" role="tab" id="tabbtn-slides" aria-controls="tab-slides">スライド</button>
+    <button data-tab="table" role="tab" id="tabbtn-table" aria-controls="tab-table">表</button>
+    <button data-tab="wbs" role="tab" id="tabbtn-wbs" aria-controls="tab-wbs">WBS</button>
+    <button data-tab="explain" role="tab" id="tabbtn-explain" aria-controls="tab-explain">解説ページ</button>
+    <button data-tab="gem" role="tab" id="tabbtn-gem" aria-controls="tab-gem">Gem 設定</button>
+    <button data-tab="help" role="tab" id="tabbtn-help" aria-controls="tab-help">使い方</button>
+  </nav>
+</div></header>
+<main>
+
+<section class="tab" id="tab-agent" role="tabpanel" aria-labelledby="tabbtn-agent" hidden data-ext-only>
+  <div id="agent-root"></div>
+</section>
+
+<section class="tab" id="tab-intake" role="tabpanel" aria-labelledby="tabbtn-intake" hidden>
+  <div id="intake-root"></div>
+</section>
+
+<section class="tab" id="tab-doc" role="tabpanel" aria-labelledby="tabbtn-doc" hidden>
+  <div class="work">
+    <div class="src">
+      <h2>文書</h2>
+      <p class="muted small">Markdown を貼ると整形して表示します。```flow のブロックは図になります。</p>
+      <textarea id="doc-src" class="mono" spellcheck="false" aria-label="Markdown"></textarea>
+      <div class="actions" id="doc-actions"></div>
+    </div>
+    <div class="view" id="doc-view"></div>
+  </div>
+</section>
+
+<section class="tab" id="tab-flow" role="tabpanel" aria-labelledby="tabbtn-flow" hidden>
+  <div class="work">
+    <div class="src">
+      <h2>図</h2>
+      <p class="muted small">記法を貼ると図にします。種類は中身から自動で選びます（変えることもできます）。書き方は Gem 設定タブの知識ファイル。</p>
+      <div class="actions">
+        <label for="fig-kind">種類</label>
+        <select id="fig-kind">
+          <option value="auto">自動</option>
+          <option value="flow">フロー図（業務の流れ）</option>
+          <option value="arch">構成図（システム・組織）</option>
+          <option value="map">論点マップ・選択肢の木</option>
+        </select>
+      </div>
+      <textarea id="flow-src" class="mono" spellcheck="false" wrap="off" aria-label="図の記法"></textarea>
+      <ul id="flow-msg" class="msgs"></ul>
+      <div class="actions">
+        <button class="primary" id="flow-png" type="button">PNG で保存</button>
+        <button id="flow-svg" type="button">SVG で保存</button>
+        <button id="flow-copy" type="button" title="Google ドキュメント・スライドに貼れる画像としてコピー">画像をコピー</button>
+      </div>
+      <div class="actions">
+        <span class="small muted">サンプル：</span>
+        <button id="flow-sample" type="button">フロー図</button>
+        <button id="arch-sample" type="button">構成図</button>
+        <button id="map-sample" type="button">論点マップ</button>
+      </div>
+    </div>
+    <div class="view" id="flow-view"></div>
+  </div>
+</section>
+
+<section class="tab" id="tab-slides" role="tabpanel" aria-labelledby="tabbtn-slides" hidden>
+  <div class="work">
+    <div class="src">
+      <h2>スライド</h2>
+      <p class="muted small">スライド JSON を貼ると 16:9 でプレビューします。</p>
+      <textarea id="deck-src" class="mono" spellcheck="false" wrap="off" aria-label="スライド JSON"></textarea>
+      <ul id="deck-msg" class="msgs"></ul>
+      <div class="actions">
+        <button class="primary" id="deck-pptx" type="button">PowerPoint で保存</button>
+        <button id="deck-gslides" type="button" title="日本語を Noto Sans JP にして保存します（Google スライドにはメイリオがないため）">Google スライド向けに保存</button>
+        <button id="deck-sample" type="button">サンプル</button>
+      </div>
+      <details><summary>Google スライドで開く前の点検</summary><ul id="deck-gcheck" class="msgs"></ul></details>
+    </div>
+    <div class="view" id="deck-view"></div>
+  </div>
+</section>
+
+<section class="tab" id="tab-table" role="tabpanel" aria-labelledby="tabbtn-table" hidden>
+  <div class="work">
+    <div class="src">
+      <h2>表</h2>
+      <p class="muted small">Markdown の表・TSV（Excel からコピーした表）・CSV を貼ると、スプレッドシート用のコピーと .xlsx にします。</p>
+      <textarea id="table-src" class="mono" spellcheck="false" wrap="off" aria-label="表"></textarea>
+      <div class="actions" id="table-actions"></div>
+    </div>
+    <div class="view" id="table-view"></div>
+  </div>
+</section>
+
+<section class="tab" id="tab-wbs" role="tabpanel" aria-labelledby="tabbtn-wbs" hidden>
+  <div class="work">
+    <div class="src">
+      <h2>WBS</h2>
+      <p class="muted small">WBS の表（| ID | 階層 | 作業 | 成果物 | 工数(h) | 依存 | 担当 | 開始 | 終了 |）を貼ると、日程を引いてガント図にします。開始・終了が空なら、依存の後から工数 8h = 1 日で引きます（土日は休み。祝日は数えません）。</p>
+      <textarea id="wbs-src" class="mono" spellcheck="false" wrap="off" aria-label="WBS の表"></textarea>
+      <ul id="wbs-msg" class="msgs"></ul>
+      <div class="actions">
+        <button class="primary" id="wbs-xlsx" type="button">.xlsx で保存（ガント付き）</button>
+        <button id="wbs-copy" type="button">表をコピー（スプレッドシート）</button>
+        <button id="wbs-png" type="button">ガント図を PNG で保存</button>
+        <button id="wbs-sample" type="button">サンプル</button>
+      </div>
+    </div>
+    <div class="view" id="wbs-view"></div>
+  </div>
+</section>
+
+<section class="tab" id="tab-explain" role="tabpanel" aria-labelledby="tabbtn-explain" hidden>
+  <div class="work">
+    <div class="src">
+      <h2>解説ページ</h2>
+      <p class="muted small">解説ページの JSON を貼ると、「結論 → 全体像 → 詳細 → 次の一手」の決まった型で、1 枚の HTML にします。保存した HTML はそのまま配れます（スクリプト・外部参照なし）。</p>
+      <textarea id="explain-src" class="mono" spellcheck="false" wrap="off" aria-label="解説ページの JSON"></textarea>
+      <ul id="explain-msg" class="msgs"></ul>
+      <div class="actions">
+        <button class="primary" id="explain-save" type="button">HTML で保存</button>
+        <button id="explain-sample" type="button">サンプル</button>
+      </div>
+    </div>
+    <div class="view" id="explain-view"></div>
+  </div>
+</section>
+
+<section class="tab" id="tab-gem" role="tabpanel" aria-labelledby="tabbtn-gem" hidden>
+  <h2>Gem 設定</h2>
+  <p class="muted small">Gem の「カスタム指示」に貼る指示文と、「知識」に入れるファイルです。知識ファイルは .md で保存して Gem に追加してください。</p>
+  <div id="gem-root" class="gem-list"></div>
+</section>
+
+<section class="tab" id="tab-help" role="tabpanel" aria-labelledby="tabbtn-help" hidden>
+  <div class="help">
+  <h2>使い方：司令塔から始める</h2>
+  <p class="lead">何から始めればよいか迷ったら、司令塔 Gem に「やりたいこと」を話します。司令塔が型（理解・アイデア出し・資料・構成図・WBS・Excel/VBA・HTML）を判定し、
+  <b>受付 → ヒヤリング → 仕様（ここだけ承認） → 作成 → 自己点検 → 修正 → 仕上げ</b>の 7 段階で進めます。応答の 1 行目に「段階・型・次に人がすること」が出ます。</p>
+  <div class="fig">
+    <h3>全体の流れ</h3>
+    <div id="help-flow"></div>
+  </div>
+  <div class="fig">
+    <h3>準備（最初の 1 回）</h3>
+    <ol>
+      <li>Gem 設定タブの「司令塔 Gem」の指示文を、Gem の「カスタム指示」に貼る。知識ファイル（フロー記法・スライド JSON・配置と情報量・図表の選び方）を .md で保存して「知識」に入れる</li>
+      <li>同じように「レビュー Gem」も作る</li>
+      <li>案件の資料は NotebookLM のノートブックにまとめておき、会話ごとに添付する（または会話にノートブックを追加する）</li>
+    </ol>
+    <h3>毎回の流れ</h3>
+    <ol>
+      <li>司令塔 Gem に依頼と資料を渡す。質問には選択肢で答える（「全部仮置きで進めて」でもよい）</li>
+      <li>段階 3 の仕様（背景・受入条件・非目標・成果物・確かめ方）を読み、「承認」か直す点を返す</li>
+      <li>応答を丸ごとコピーし、<b>取り込み</b>タブに貼る。図・文書・表・スライドが見分けられ、行き先と書き出しのボタンが出る</li>
+      <li>段階 5 で出たレビュー依頼文を、観点ごとに新しいチャットでレビュー Gem に渡す。指摘の表を司令塔に返して直させる</li>
+      <li>直したいときは同じ会話で指示する。変えた節だけが返る</li>
+    </ol>
+  </div>
+  <div class="fig">
+    <h3>Google への出口</h3>
+    <div class="tablewrap"><table>
+      <tr><th>渡す先</th><th>ボタン</th><th>手順</th></tr>
+      <tr><td>Google ドキュメント</td><td>Google ドキュメント用にコピー</td><td>新しいドキュメントに Ctrl+V。見出し・表・太字・フロー図（画像）が保たれる。崩れたら「.docx で保存」→ Drive にアップロード →「アプリで開く → Google ドキュメント」</td></tr>
+      <tr><td>Google スプレッドシート</td><td>表をコピー／.xlsx で保存</td><td>コピーはセル A1 を選んで Ctrl+V。.xlsx は見出しの固定・フィルタ・罫線付き。Excel でもそのまま開ける</td></tr>
+      <tr><td>Google スライド</td><td>Google スライド向けに保存</td><td>日本語を Noto Sans JP にした .pptx を Drive にアップロード →「アプリで開く → Google スライド」。PowerPoint で使うなら「PowerPoint で保存」</td></tr>
+      <tr><td>NotebookLM</td><td>NotebookLM 用 .md</td><td>ソースに追加する。同じ名前の古いソースは先に削除する（古い版と混ざると回答が食い違う）</td></tr>
+      <tr><td>Excel（VBA）</td><td>コピー</td><td>Alt+F11 →［挿入］→［標準モジュール］に貼って F5。エラーが出たら、エラー文と止まった行を司令塔に貼る</td></tr>
+    </table></div>
+    <p class="muted small">Docs・Slides の右側の Gemini パネルが使える場合は、書き出した後の言い回しの調整をそこで行ってもよい。構成や表を変えるときは司令塔に戻して直す（中身がずれないように）。</p>
+  </div>
+  <div class="fig">
+    <h3>Chrome 拡張で自動にする（コピペ・管理・状況の把握を減らす）</h3>
+    <p>拡張を入れると、Gemini の画面の横（サイドパネル）にこの画面が出て、「エージェント」タブが増えます。依頼を書いて「送って進める」を押すと、送信・応答の回収・道具の実行・成果物の保存を自動で繰り返し、人の判断が要るところ（仕様の承認・質問）でだけ止まります。</p>
+    <h3>入れ方（最初の 1 回）</h3>
+    <ol>
+      <li>配られた <code>extension</code> フォルダを PC に置く（場所を変えると読み込み直しが要る）</li>
+      <li>Chrome で <code>chrome://extensions</code> を開き、右上の「デベロッパー モード」をオンにする</li>
+      <li>「パッケージ化されていない拡張機能を読み込む」で <code>extension</code> フォルダを選ぶ</li>
+      <li>ツールバーのパズルの印から「Gemini エージェント」を固定し、押すとサイドパネルが開く</li>
+      <li>エージェントタブの「設定」に、司令塔 Gem とレビュー Gem の URL（Gem を開いたときのアドレス）を入れる</li>
+    </ol>
+    <h3>使い方</h3>
+    <ol>
+      <li>案件ごとにフォルダを作り、資料を <code>資料/</code> に入れる。「案件フォルダを選ぶ」で選ぶ（次からは自動で開く）</li>
+      <li>「司令塔 Gem を開く」→ 依頼を書いて「送って進める」</li>
+      <li>止まったら、黄色の枠の質問に答えるか「承認」を押す。書き込みの前は赤い枠で許可を聞く</li>
+      <li>成果物は <code>out/</code>、案件メモと状況は <code>case/</code> に自動で保存される（<code>case/status.md</code> を開けば今の状況が分かる）。パネルの上にも今の段階・次の一手・未回答の質問が出る</li>
+      <li>NotebookLM に聞くときは、ノートブックを別のタブで開いておく</li>
+    </ol>
+    <div class="tablewrap"><table>
+      <tr><th>道具</th><th>できること</th></tr>
+      <tr><td>list_dir・read_file・search</td><td>案件フォルダの一覧・読み込み（txt・md・csv・json・xlsx・docx）・検索。フォルダの外は読めない</td></tr>
+      <tr><td>write_file・render</td><td><code>out/</code> にだけ書く。上書きの前に <code>out/_控え/</code> に控えを残す</td></tr>
+      <tr><td>run_js</td><td>計算だけを隔離した場所で実行（3 秒まで・通信できない）</td></tr>
+      <tr><td>ask_notebooklm</td><td>開いている NotebookLM に質問して、回答を受け取る</td></tr>
+      <tr><td>review</td><td>レビュー Gem を観点ごとに別のタブで開いて点検させる（最大 3 つ・互いの結果は見せない）</td></tr>
+      <tr><td>ask_user</td><td>人に聞く・承認を取る</td></tr>
+    </table></div>
+    <h3>動かないとき</h3>
+    <ul>
+      <li>「つながりを確かめる」を押す。「入力欄が見つかりません」なら Gemini の画面の作りが変わっている。設定の「セレクタ」を直す。直すまでは、Gemini の応答をコピーして取り込みタブに貼る従来の使い方ができる</li>
+      <li>1 回の依頼で進むのは 20 手まで（設定で変えられる）。同じ道具が 3 回続けて失敗すると止まる。「止める」でいつでも止められる</li>
+      <li>拡張自体は通信しない。Gemini と NotebookLM の画面に文を入れて、表示された応答を読むだけ。自動で操作してよいかは、社内の規程を確かめてから使う</li>
+    </ul>
+  </div>
+  <div class="fig">
+    <h3>守ること</h3>
+    <ul>
+      <li>このツールはネットワークに出ません。貼った内容は保存しません（タブを閉じると消えます）</li>
+      <li>案件の資料を Gemini に渡すのは、会社で許可された Gemini（Workspace 版）と NotebookLM だけにする</li>
+    </ul>
+  </div>
+  </div>
+</section>
+
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="panel.js"></script>
+</body>
+</html>
