@@ -5639,7 +5639,7 @@ ${d.notes.length ? `<ul class="notes">${d.notes.map((n) => `<li>${inline(n)}</li
   let ctx = null;
   const S = {
     // mode：plan（計画。読むだけ）／exec（実行。書く前に許可）
-    settings: { conductorUrl: "", reviewerUrl: "", maxSteps: 20, autoSave: true, confirmWrite: true, archive: true, qaPromptPrefix: false, mode: "plan" },
+    settings: { conductorUrl: "", reviewerUrl: "", notebookUrl: "", maxSteps: 20, autoSave: true, confirmWrite: true, archive: true, qaPromptPrefix: false, mode: "plan" },
     edits: [], planFiles: [], modeSent: "", runReads: new Set(), runSearches: new Set(),
     fs: null, folderName: "", note: null, running: false, stop: false, gate: null, lastArtifact: "", firstSent: false, log: [], holds: new Set(),
     // 案件の設定（案件の設定.md）から読んだリンク。拡張の保存領域には入れない
@@ -5865,14 +5865,15 @@ ${d.notes.length ? `<ul class="notes">${d.notes.map((n) => `<li>${inline(n)}</li
     if (!S.fs) { UI.links.append(el("p", { class: "muted small", text: "案件フォルダを選ぶと、ここで案件ごとの NotebookLM・Gem の URL を登録できます" })); return; }
     if (!S.conf.exists) UI.links.append(el("p", { class: "small" }, `${GK.caseconf.FILE} はまだありません。`, el("button", { type: "button", class: "linklike", text: "ひな形を作る", onclick: createConf }), "（下の欄に入れても作られます）"));
     for (const k of GK.caseconf.KEYS) {
-      const ph = !k.kind ? "例：資料/仕様, src（out/ はいつでも書けます）" : k.kind === "notebooklm" ? "https://notebooklm.google.com/notebook/…" : `https://gemini.google.com/gem/…${linkOf(k.key) && !S.conf.links[k.key] ? "（未登録：設定の既定値を使います）" : ""}`;
+      const dflt = linkOf(k.key) && !S.conf.links[k.key] ? "（未登録：設定の値を使います）" : "";
+      const ph = !k.kind ? "例：資料/仕様, src（out/ はいつでも書けます）" : k.kind === "notebooklm" ? `https://notebooklm.google.com/notebook/…${dflt}` : `https://gemini.google.com/gem/…${dflt}`;
       const inp = el("input", { type: k.kind ? "url" : "text", value: S.conf.links[k.key] || "", placeholder: ph, "aria-label": k.kind ? `${k.label} の URL` : k.label, spellcheck: "false" });
       inp.addEventListener("change", () => saveLink(k.key, inp.value));
       UI.links.append(el("label", { class: "ag-set" }, el("span", { text: k.kind ? k.label : `${k.label}（Gemini にファイルを直させてよいフォルダ）` }), inp));
     }
     if (S.conf.errors.length) UI.links.append(el("ul", { class: "ag-list" }, S.conf.errors.map((e) => el("li", { class: "err", text: e.msg }))));
     UI.links.append(el("div", { class: "actions" },
-      el("button", { type: "button", text: "NotebookLM を開く", onclick: async () => { const u = S.conf.links.notebook; if (!u) { ctx.toast(`${GK.caseconf.FILE} に NotebookLM の URL を入れてください`, "err"); return; } await chrome.tabs.create({ url: u }); } }),
+      el("button", { type: "button", text: "NotebookLM を開く", onclick: async () => { const u = linkOf("notebook"); if (!u) { ctx.toast(`設定か ${GK.caseconf.FILE} に NotebookLM の URL を入れてください`, "err"); return; } await chrome.tabs.create({ url: u }); } }),
       el("button", { type: "button", text: "読み直す", title: `${GK.caseconf.FILE} を手で書き換えたとき`, onclick: async () => { S.conf.hash = "-"; await loadConf(); ctx.toast("読み直しました"); } })));
   }
   async function saveNote() {
@@ -5990,25 +5991,29 @@ ${d.notes.length ? `<ul class="notes">${d.notes.map((n) => `<li>${inline(n)}</li
   async function findCaseTab(kind) {
     if (kind !== "notebooklm" && kind !== "gemini") return findTab(kind);
     await loadConf(); // 送る直前に読み直す（人がファイルを書き換えていても拾う）
-    const want = S.conf.links[kind === "notebooklm" ? "notebook" : "conductor"] || "";
+    // NotebookLM は 案件の設定.md → 設定（全案件共通）の順。Gem は案件の設定.md だけ（無ければ開いている Gemini のタブ）
+    const want = (kind === "notebooklm" ? linkOf("notebook") : S.conf.links.conductor) || "";
+    const from = !want ? "開いているタブ" : kind === "notebooklm" && !S.conf.links.notebook ? "設定" : GK.caseconf.FILE;
     const tabs = (await chrome.tabs.query({})).filter((t) => HOSTS()[kind].some((h) => String(t.url || "").startsWith(h)));
     const pick = (list) => list.find((t) => t.active) || list[0] || null;
+    // 送り先を見せる（入れ替え忘れに気づけるように）。題名だけで、URL は出さない・監査ログにも入れない
+    const shown = (t) => { if (t && kind === "notebooklm") say(`NotebookLM の送り先：${t.title || "（題名なし）"}（${from}）`, "ok"); return t; };
     if (want) {
       const hit = tabs.filter((t) => GK.caseconf.matches(t.url, want));
-      if (hit.length) return pick(hit);
+      if (hit.length) return shown(pick(hit));
       if (kind === "notebooklm") {
         const t = await chrome.tabs.create({ url: want, active: true });
         await waitLoaded(t.id);
         await new Promise((r) => setTimeout(r, 1500));
-        say("案件の設定.md のノートブックを開きました", "ok");
-        return chrome.tabs.get(t.id);
+        return shown(await chrome.tabs.get(t.id));
       }
     }
-    if (kind === "notebooklm" && tabs.length > 1) throw new Error(`どのノートブックか分かりません（NotebookLM のタブが ${tabs.length} つ開いています）。${GK.caseconf.FILE} に NotebookLM の URL を書いてください`);
-    return pick(tabs);
+    if (kind === "notebooklm" && tabs.length > 1) throw new Error(`どのノートブックか分かりません（NotebookLM のタブが ${tabs.length} つ開いています）。エージェントタブの設定か ${GK.caseconf.FILE} に NotebookLM の URL を入れてください`);
+    return shown(pick(tabs));
   }
   // リンク：案件の設定 → パネルの設定（既定値）の順
-  const linkOf = (key) => S.conf.links[key] || (key === "conductor" ? S.settings.conductorUrl : key === "reviewer" ? S.settings.reviewerUrl : "") || "";
+  const SETTING_KEY = { conductor: "conductorUrl", reviewer: "reviewerUrl", notebook: "notebookUrl" };
+  const linkOf = (key) => S.conf.links[key] || (SETTING_KEY[key] ? S.settings[SETTING_KEY[key]] : "") || "";
   async function findTab(kind) {
     const tabs = await chrome.tabs.query({});
     const ok = tabs.filter((t) => HOSTS()[kind].some((h) => String(t.url || "").startsWith(h)));
@@ -6645,11 +6650,24 @@ ${d.notes.length ? `<ul class="notes">${d.notes.map((n) => `<li>${inline(n)}</li
   function settingsPanel() {
     const s = S.settings;
     const inp = (k, label, type) => { const i = el("input", { type: type || "text", value: s[k] ?? "", "aria-label": label }); if (type === "checkbox") i.checked = !!s[k]; i.addEventListener("change", async () => { s[k] = type === "checkbox" ? i.checked : type === "number" ? Math.max(1, Math.min(60, +i.value || 20)) : i.value.trim(); await store.set("settings", s); }); return el("label", { class: "ag-set" }, el("span", { text: label }), i); };
+    // NotebookLM の URL：全案件共通。案件を替えたら入れ替える（案件の設定.md に書いてあれば、そちらが先）
+    const nlmInp = () => {
+      const label = "NotebookLM の URL（https://notebooklm.google.com/notebook/…。案件を替えたら入れ替える）";
+      const i = el("input", { type: "url", value: s.notebookUrl || "", "aria-label": label, spellcheck: "false" });
+      i.addEventListener("change", async () => {
+        const u = i.value.trim();
+        if (u && !GK.caseconf.valid("notebooklm", u, HOSTS())) { ctx.toast("NotebookLM のノートブックの URL ではありません（https://notebooklm.google.com/notebook/…）", "err"); i.value = s.notebookUrl || ""; return; }
+        s.notebookUrl = u; await store.set("settings", s); renderLinks();
+        ctx.toast(u ? "NotebookLM の URL を設定しました" : "NotebookLM の URL を空にしました");
+      });
+      return el("label", { class: "ag-set" }, el("span", { text: label }), i);
+    };
     const selTa = el("textarea", { rows: 6, class: "mono", spellcheck: "false", "aria-label": "セレクタ" });
     store.get("selectors").then((v) => { selTa.value = JSON.stringify(v || { gemini: {}, notebooklm: {} }, null, 2); });
     return el("details", { class: "ag-settings" }, el("summary", { text: "設定" }),
       inp("conductorUrl", "司令塔 Gem の URL（https://gemini.google.com/gem/…）"),
       inp("reviewerUrl", "レビュー Gem の URL（review で使う）"),
+      nlmInp(),
       inp("maxSteps", "1 回の依頼で進める手数の上限", "number"),
       inp("autoSave", "成果物を out/ に自動で保存する", "checkbox"),
       inp("confirmWrite", "write_file の前に毎回許可を取る", "checkbox"),

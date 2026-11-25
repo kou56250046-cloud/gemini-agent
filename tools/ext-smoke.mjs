@@ -293,9 +293,17 @@ try {
     const names = (await ag.fs.list(["case", "audit"])).filter((x) => !x.dir).map((x) => x.name);
     let auditText = "";
     for (const nm of names) auditText += new TextDecoder().decode(await ag.fs.read(["case", "audit", nm]));
+    // 設定の URL（全案件共通）：案件の設定.md が先。md を空にすると設定の URL を使う
+    ag.settings.notebookUrl = base + "A";
+    const mdFirst = (await ag.findCaseTab("notebooklm")).url.startsWith(base + "B");
+    await T.saveLink("notebook", "");
+    const tA = await ag.findCaseTab("notebooklm");
+    const settingUsed = tA.url.startsWith(base + "A");
+    const sayShown = /NotebookLM の送り先：.*（設定）/.test(document.querySelector("#agent-root").textContent);
+    ag.settings.notebookUrl = "";
     const linkRows = document.querySelectorAll("#agent-root .ag-links input").length;
     await chrome.tabs.remove(a.id).catch(() => {}); await chrome.tabs.remove(tB2.id).catch(() => {});
-    return { unregistered, saved, fileHasB: fileText.includes(base + "B"), pickedB: tB.url.startsWith(base + "B"), replied: reply.length > 0, badSaved, reopened: tB2.url.startsWith(base + "B") && n1 === n0 + 1, auditNoUrl: !auditText.includes("/notebook/B"), auditHasRead: auditText.includes("案件の設定の読み込み"), linkRows, linkRowsNote: "URL 3 つ＋書ける場所" };`);
+    return { unregistered, saved, fileHasB: fileText.includes(base + "B"), pickedB: tB.url.startsWith(base + "B"), replied: reply.length > 0, badSaved, reopened: tB2.url.startsWith(base + "B") && n1 === n0 + 1, auditNoUrl: !auditText.includes("/notebook/B"), mdFirst, settingUsed, sayShown, auditHasRead: auditText.includes("案件の設定の読み込み"), linkRows, linkRowsNote: "URL 3 つ＋書ける場所" };`);
   await panel.ev(`document.querySelector("#agent-root .ag-links").scrollIntoView(); return 1;`);
   await panel.shot("ext-panel-links.png");
 
