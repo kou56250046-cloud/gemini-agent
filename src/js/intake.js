@@ -78,7 +78,6 @@
     if (l === "json" || l === "") {
       const j = jsonOf(t);
       if (j && !Array.isArray(j) && Array.isArray(j.slides)) return "slides";
-      if (j && !Array.isArray(j) && j.tool && typeof j.tool === "string") return "tool";
       if (j && !Array.isArray(j) && Array.isArray(j.sections) && j.title) return "explain";
     }
     if ((l === "" || l === "text") && looksLikeFlow(t)) return "flow";

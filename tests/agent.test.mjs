@@ -194,11 +194,12 @@ test("司令塔 Gem：Gem 設定に入り、見出しの形・ブロック名・
 test("Gem 設定：レビュー Gem があり、指示文の知識ファイルはすべて実在する", () => {
   const items = readItems();
   const gems = items.filter((x) => x.category === "Gem 指示文");
-  assert.deepEqual(gems.map((g) => g.id), ["gem-conductor", "gem-reviewer"]);
+  assert.deepEqual(gems.map((g) => g.id), ["gem-conductor", "gem-reviewer", "gem-minutes"]);
   for (const g of gems) {
-    assert.ok(g.knowledge && g.knowledge.length, g.id);
+    // 議事録 Gem は知識ファイルが要らない（説明だけ必須）
+    if (g.id !== "gem-minutes") assert.ok(g.knowledge && g.knowledge.length, g.id);
     assert.ok(g.knowledgeNote, g.id);
-    for (const k of g.knowledge) assert.ok(items.some((x) => x.id === k.id && x.category !== "Gem 指示文"), `${g.id} → ${k.id}`);
+    for (const k of g.knowledge || []) assert.ok(items.some((x) => x.id === k.id && x.category !== "Gem 指示文"), `${g.id} → ${k.id}`);
   }
   for (const it of items) assert.doesNotMatch(it.body, /キットの|判断・データ/, `${it.id} に gemini-kit 固有の言い回し`);
 });

@@ -2,22 +2,39 @@
 <html lang="ja">
 <head><meta charset="utf-8"><title>ダミーの NotebookLM（拡張の試験用）</title></head>
 <body>
-<!-- 拡張の試験用。NotebookLM の質問欄と回答だけを真似る。通信はしない -->
+<!-- 拡張の試験用。NotebookLM の質問欄と回答だけを真似る。通信はしない
+     質問箱の形（「指定の形式」「答え直して」を含む）で聞かれたら、質問箱のブロック形式で返す -->
 <div id="chat"></div>
 <textarea class="query-box-input" aria-label="クエリボックス"></textarea>
 <button class="submit-button" type="button" aria-label="送信">送信</button>
 <script>
-document.querySelector(".submit-button").addEventListener("click", () => {
-  const q = document.querySelector(".query-box-input");
-  const t = q.value; q.value = "";
-  setTimeout(() => {
+(function () {
+  "use strict";
+  const block = (head, q, status, ans) => `## ${head}\n案件: ダミー\n分類: 業務\n状態: ${status}\n根拠: 資料A.pdf\n要確認の理由: ${status === "確定" ? "" : "資料に無い"}\n### 質問\n${q}\n### 回答\n${ans}\n`;
+  function qaReply(t) {
+    // 聞き直し（## Q-001 の見出しつき）：締め日は確定になった
+    if (/答え直して/.test(t)) return block("Q-001", "締め日は？", "確定", "月末で確定です。");
+    const qs = [...t.matchAll(/質問 \d+：(.+)/g)].map((m) => m[1].trim());
+    if (!qs.length) qs.push(t.split("\n").filter((l) => l.trim()).pop());
+    return qs.map((q) => (/締め日/.test(q) ? block("新規", q, "要確認", "資料に締め日の記載はありません。") : block("新規", q, "確定", "上限は 10 万円です（ダミー）。"))).join("\n");
+  }
+  function render(t) {
     const c = document.createElement("div"); c.className = "to-user-container";
     const m = document.createElement("div"); m.className = "message-text-content";
-    const p = document.createElement("p"); p.textContent = /締め日/.test(t) ? "締め日は月末です（ダミー）" : "資料にありません";
-    const s = document.createElement("sup"); s.textContent = "1"; p.append(s);
-    m.append(p); c.append(m); document.getElementById("chat").append(c);
-  }, 300);
-});
+    if (/指定の形式|答え直して/.test(t)) {
+      const pre = document.createElement("pre"); pre.textContent = qaReply(t); m.append(pre);
+    } else {
+      const p = document.createElement("p"); p.textContent = /締め日/.test(t) ? "締め日は月末です（ダミー）" : "資料にありません";
+      const s = document.createElement("sup"); s.textContent = "1"; p.append(s); m.append(p);
+    }
+    c.append(m); document.getElementById("chat").append(c);
+  }
+  document.querySelector(".submit-button").addEventListener("click", () => {
+    const q = document.querySelector(".query-box-input");
+    const t = q.value; q.value = "";
+    setTimeout(() => render(t), 300);
+  });
+})();
 </script>
 </body>
 </html>

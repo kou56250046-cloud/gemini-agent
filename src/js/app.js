@@ -335,6 +335,29 @@
     if (r.svg && !r.graph.errors.length) $("#help-flow").append(h("div", { class: "tablewrap" }, GK.preview.parseSvg(r.svg)));
   }
 
+  // ---------- 配る：この HTML と Chrome 拡張（zip）を保存する（HTML で開いたときだけ。拡張のパネルでは出さない） ----------
+  function initDownloads() {
+    const box = $("#dl-box");
+    if (!box || GK.runnerUI.EXT || !GK.PRISTINE_HTML) return;
+    box.append(h("button", { type: "button", text: "この HTML を保存", title: "このツールを 1 ファイルで保存します。オフラインで開けます", onclick: () => {
+      download("gemini-agent.html", GK.PRISTINE_HTML, "text/html;charset=utf-8");
+      toast("gemini-agent.html を保存しました。ダブルクリックでオフラインで開けます");
+    } }));
+    if (GK.EXT_ZIP) {
+      box.append(h("button", { type: "button", class: "primary", text: "Chrome 拡張をダウンロード", title: "サイドパネルで自動で進める拡張（zip）", onclick: () => {
+        const bin = atob(GK.EXT_ZIP);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        download(`gemini-agent-extension-${GK.EXT_VERSION || ""}.zip`, new Blob([u8], { type: "application/zip" }));
+        toast("zip を保存しました。展開して、chrome://extensions →「デベロッパー モード」→「パッケージ化されていない拡張機能を読み込む」で gemini-agent-extension フォルダを選んでください");
+        gotoTab("help");
+        const f = document.getElementById("help-ext");
+        if (f) f.scrollIntoView({ block: "start" });
+      } }));
+    }
+    box.hidden = false;
+  }
+
   function start() {
     GK.intakeUI.init({
       toast, copyText, download, themeHash, parseSvg: GK.preview.parseSvg,
@@ -357,6 +380,12 @@
     initHelp();
     // エージェント（拡張のときだけ）。拡張でなければ、ここでタブごと消える（initTabs より前に呼ぶ）
     GK.runnerUI.init({ toast, drawFig, openIntake: (t) => { GK.intakeUI.load(t); gotoTab("intake"); } });
+    // 会議・質問箱・監査（監査は拡張のときだけ。HTML のときは上でタブごと消えている）
+    const tabCtx = { toast, copyText, download, gotoTab: (n) => gotoTab(n) };
+    GK.meetUI.init(tabCtx);
+    GK.qaUI.init(tabCtx);
+    if (GK.auditUI) GK.auditUI.init(tabCtx);
+    initDownloads();
     initTabs();
   }
   GK.app = { start, HELP_FLOW };

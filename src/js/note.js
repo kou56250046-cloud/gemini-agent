@@ -67,6 +67,19 @@
     return { note, added, updated, answered };
   }
 
+  // 別の会話（議事録など）で 01 から振られた番号を、案件メモの続きの番号に振り直す（同じ番号で上書きしないように）。
+  // memo の中で同じ ID が 2 回出たら（Q-01 と「Q-01 回答済」）、同じ新しい番号にそろえる
+  function renumber(note, items) {
+    const n = note || empty();
+    const next = { facts: 0, decisions: 0, questions: 0 };
+    for (const k of Object.keys(next)) next[k] = n[k].reduce((m, x) => Math.max(m, +String(x.id).slice(2) || 0), 0);
+    const map = new Map();
+    return items.map((it) => {
+      if (!map.has(it.id)) { next[it.coll]++; map.set(it.id, `${it.id[0]}-${String(next[it.coll]).padStart(2, "0")}`); }
+      return Object.assign({}, it, { id: map.get(it.id) });
+    });
+  }
+
   // 応答の見出し（intake.header）を note に入れる
   function setHeader(note, header) {
     if (!header) return note;
@@ -121,5 +134,5 @@
     return [`# ${note.name || "案件"}：案件メモ`, "", ...["facts", "decisions", "questions"].flatMap((k) => [`## ${LABEL[k]}`, ...note[k].map((x) => `- ${x.id} ${x.text}${x.status === "回答済" ? ` → 回答：${x.answer}` : ""}`), ""])].join("\n");
   }
 
-  GK.note = { SCHEMA, empty, parseMemo, merge, setHeader, statusMd, indexMd, addArtifact, notebookMd, STAGES };
+  GK.note = { SCHEMA, empty, parseMemo, merge, renumber, setHeader, statusMd, indexMd, addArtifact, notebookMd, STAGES };
 })(globalThis.GK = globalThis.GK || {});

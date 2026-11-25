@@ -21,6 +21,10 @@ header.top { background: var(--head); color: #fff; position: sticky; top: 0; z-i
 header.top .top-in { max-width: 1600px; margin: 0 auto; padding: 0 20px; display: flex; flex-wrap: wrap; align-items: center; column-gap: 24px; min-height: 40px; }
 header.top h1 { font-size: 16px; margin: 0; white-space: nowrap; letter-spacing: .02em; }
 header.top h1 small { color: #C9D4E3; font-weight: normal; margin-left: 8px; font-size: 12px; }
+.dl-box { margin-left: auto; display: flex; gap: 6px; }
+.dl-box button { min-height: 30px; padding: 0 10px; border: 1px solid #C9D4E3; border-radius: 6px; background: transparent; color: #fff; font-size: 12.5px; cursor: pointer; }
+.dl-box button:hover { background: rgba(255,255,255,.12); }
+.dl-box button.primary { background: var(--gold); border-color: var(--gold); color: #fff; }
 nav.tabs { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px; border-top: 1px solid rgba(255,255,255,.12); }
 nav.tabs button { background: none; border: 0; border-radius: 0; color: #C9D4E3; font: inherit; padding: 0 14px; min-height: 40px; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
 nav.tabs button:hover { color: #fff; }
@@ -121,6 +125,21 @@ select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; ba
 .ag-gate-h { margin: 0 0 4px; font-weight: bold; color: #6E4B00; }
 .ag-approve { background: #FDF1F0; border-color: #E9B4AE; border-left-color: var(--err); }
 .ag-log li { font-size: 12px; }
+.ag-today { margin: 0 0 8px; padding: 8px 12px; background: #FFF8E8; border: 1px solid #E5C77F; border-radius: 6px; }
+.ag-busy.ag-st-idle { background: #F1F3F6; color: var(--sub); }
+.ag-busy.ag-st-human, .ag-busy.ag-st-permit { background: #FFF1D6; color: #6E4B00; font-weight: bold; }
+.ag-busy.ag-st-meet { background: #FDECEA; color: var(--err); }
+.ag-rec { color: var(--err); font-weight: bold; }
+button.linklike { border: 0; background: none; padding: 0; min-height: 0; color: var(--navy); text-decoration: underline; cursor: pointer; }
+.qa-table td { font-size: 12.5px; }
+.qa-table td:nth-child(5) { min-width: 180px; }
+.qa-st { font-size: 12px; min-height: 28px; padding: 2px 4px; }
+.qa-st-確定 { background: #E6F2EC; } .qa-st-要確認 { background: #FDECEA; } .qa-st-提案 { background: #FFF1D6; } .qa-st-未確定 { background: #E8F1FE; }
+.qa-upd { border-top: 1px solid #E5C77F; padding: 8px 0; }
+.qa-diff { max-height: 220px; overflow: auto; background: #fff; border: 1px solid var(--line); padding: 6px; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; }
+.qa-add { color: var(--ok); } .qa-del { color: var(--err); text-decoration: line-through; }
+.au-table td { font-size: 12px; white-space: nowrap; }
+.au-ng td { background: #FDECEA; }
 .ag-settings { margin-top: 14px; }
 .ag-set { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; font-size: 12.5px; }
 .ag-set input[type=text], .ag-set input[type=number] { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
@@ -156,6 +175,7 @@ button.danger { color: var(--err); }
 <body>
 <header class="top"><div class="top-in">
   <h1>Gemini エージェント<small>オフラインで動作・外部送信なし</small></h1>
+  <div class="dl-box" id="dl-box" hidden></div>
   <nav class="tabs" role="tablist" aria-label="機能">
     <button data-tab="agent" role="tab" id="tabbtn-agent" aria-controls="tab-agent" data-ext-only>エージェント</button>
     <button data-tab="intake" role="tab" id="tabbtn-intake" aria-controls="tab-intake">取り込み</button>
@@ -165,6 +185,9 @@ button.danger { color: var(--err); }
     <button data-tab="table" role="tab" id="tabbtn-table" aria-controls="tab-table">表</button>
     <button data-tab="wbs" role="tab" id="tabbtn-wbs" aria-controls="tab-wbs">WBS</button>
     <button data-tab="explain" role="tab" id="tabbtn-explain" aria-controls="tab-explain">解説ページ</button>
+    <button data-tab="meet" role="tab" id="tabbtn-meet" aria-controls="tab-meet">会議</button>
+    <button data-tab="qa" role="tab" id="tabbtn-qa" aria-controls="tab-qa">質問箱</button>
+    <button data-tab="audit" role="tab" id="tabbtn-audit" aria-controls="tab-audit" data-ext-only>監査</button>
     <button data-tab="gem" role="tab" id="tabbtn-gem" aria-controls="tab-gem">Gem 設定</button>
     <button data-tab="help" role="tab" id="tabbtn-help" aria-controls="tab-help">使い方</button>
   </nav>
@@ -287,6 +310,18 @@ button.danger { color: var(--err); }
   </div>
 </section>
 
+<section class="tab" id="tab-meet" role="tabpanel" aria-labelledby="tabbtn-meet" hidden>
+  <div id="meet-root"></div>
+</section>
+
+<section class="tab" id="tab-qa" role="tabpanel" aria-labelledby="tabbtn-qa" hidden>
+  <div id="qa-root"></div>
+</section>
+
+<section class="tab" id="tab-audit" role="tabpanel" aria-labelledby="tabbtn-audit" hidden data-ext-only>
+  <div id="audit-root"></div>
+</section>
+
 <section class="tab" id="tab-gem" role="tabpanel" aria-labelledby="tabbtn-gem" hidden>
   <h2>Gem 設定</h2>
   <p class="muted small">Gem の「カスタム指示」に貼る指示文と、「知識」に入れるファイルです。知識ファイルは .md で保存して Gem に追加してください。</p>
@@ -330,14 +365,14 @@ button.danger { color: var(--err); }
     </table></div>
     <p class="muted small">Docs・Slides の右側の Gemini パネルが使える場合は、書き出した後の言い回しの調整をそこで行ってもよい。構成や表を変えるときは司令塔に戻して直す（中身がずれないように）。</p>
   </div>
-  <div class="fig">
+  <div class="fig" id="help-ext">
     <h3>Chrome 拡張で自動にする（コピペ・管理・状況の把握を減らす）</h3>
     <p>拡張を入れると、Gemini の画面の横（サイドパネル）にこの画面が出て、「エージェント」タブが増えます。依頼を書いて「送って進める」を押すと、送信・応答の回収・道具の実行・成果物の保存を自動で繰り返し、人の判断が要るところ（仕様の承認・質問）でだけ止まります。</p>
     <h3>入れ方（最初の 1 回）</h3>
     <ol>
-      <li>配られた <code>extension</code> フォルダを PC に置く（場所を変えると読み込み直しが要る）</li>
+      <li>画面の右上の「Chrome 拡張をダウンロード」で zip を保存し、展開して <code>gemini-agent-extension</code> フォルダを PC に置く（場所を変えると読み込み直しが要る。新しい版は同じ場所に上書きして、拡張機能の画面で再読み込み）</li>
       <li>Chrome で <code>chrome://extensions</code> を開き、右上の「デベロッパー モード」をオンにする</li>
-      <li>「パッケージ化されていない拡張機能を読み込む」で <code>extension</code> フォルダを選ぶ</li>
+      <li>「パッケージ化されていない拡張機能を読み込む」で <code>gemini-agent-extension</code> フォルダを選ぶ</li>
       <li>ツールバーのパズルの印から「Gemini エージェント」を固定し、押すとサイドパネルが開く</li>
       <li>エージェントタブの「設定」に、司令塔 Gem とレビュー Gem の URL（Gem を開いたときのアドレス）を入れる</li>
     </ol>
@@ -363,6 +398,15 @@ button.danger { color: var(--err); }
       <li>「つながりを確かめる」を押す。「入力欄が見つかりません」なら Gemini の画面の作りが変わっている。設定の「セレクタ」を直す。直すまでは、Gemini の応答をコピーして取り込みタブに貼る従来の使い方ができる</li>
       <li>1 回の依頼で進むのは 20 手まで（設定で変えられる）。同じ道具が 3 回続けて失敗すると止まる。「止める」でいつでも止められる</li>
       <li>拡張自体は通信しない。Gemini と NotebookLM の画面に文を入れて、表示された応答を読むだけ。自動で操作してよいかは、社内の規程を確かめてから使う</li>
+    </ul>
+  </div>
+  <div class="fig">
+    <h3>会議・質問箱・監査</h3>
+    <ul>
+      <li><b>会議</b>：拡張のときは Meet の字幕（CC をオン）を記録して文字起こしにし、「議事録を作る」で Gemini（議事録 Gem）に送ります。議事録（.md・.docx）・宿題（.xlsx）を <code>資料/議事録/</code> に保存し、決定と未決を案件メモに足します。発言の量はこのツールが数えます。VTT・Teams・Meet の文字起こしのファイルや貼り付けからも作れます。記録してよいか、参加者に先に伝えてください</li>
+      <li><b>質問箱</b>：NotebookLM のチャットの設定に Gem 設定タブの「質問箱の回答の形」を入れておくと、拡張のときは質問を送るだけで回答が状態つきで取り込まれます。新しい質問は自動で入り、既にある質問の回答が変わったときだけ差分を見て選びます。要確認・未確定はまとめて聞き直せます。qa-box.html の控え（JSON）も読み込めます</li>
+      <li><b>監査</b>（拡張）：どこで・誰が・何を・どこまで進めたかを <code>case/audit/</code> に 1 行ずつ残します。本文は入れず、ハッシュでつないでいるので、書き換え・削除は「検証」で分かります。本文は <code>case/会話/</code>（設定でオフにできる）にあり、監査タブから照合できます</li>
+      <li><b>そのほか</b>（拡張）：Gemini の入力欄で <code>/仕様</code> などのあとに Tab で定型文になります。右クリックの「このページを案件の資料に保存」で、見ているページを <code>資料/取り込み/</code> に保存できます。朝の確認の通知と「今日の確認」、Gem の編集画面への指示文の流し込み（保存は人が押す）もあります</li>
     </ul>
   </div>
   <div class="fig">

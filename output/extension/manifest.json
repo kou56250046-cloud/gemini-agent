@@ -1,22 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Gemini エージェント",
-  "version": "0.1.0",
-  "description": "Gemini と NotebookLM の画面をつなぎ、案件を段階を踏んで進める（社内用・通信しない）",
+  "version": "0.2.0",
+  "description": "Gemini・NotebookLM・Meet の画面をつなぎ、案件を段階を踏んで進める（社内用・通信しない）",
   "permissions": [
     "sidePanel",
     "storage",
-    "scripting"
+    "scripting",
+    "alarms",
+    "notifications",
+    "contextMenus",
+    "activeTab"
   ],
   "host_permissions": [
     "https://gemini.google.com/*",
-    "https://notebooklm.google.com/*"
+    "https://notebooklm.google.com/*",
+    "https://meet.google.com/*"
   ],
   "side_panel": {
     "default_path": "panel.html"
   },
   "action": {
-    "default_title": "Gemini エージェント"
+    "default_title": "Gemini エージェント",
+    "default_icon": {
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "128": "icon128.png"
   },
   "background": {
     "service_worker": "background.js"
@@ -41,6 +52,15 @@
         "content-nlm.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "content-meet.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "sandbox": {
@@ -49,7 +69,7 @@
     ]
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'none'; frame-src 'self'",
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src 'self'",
     "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-eval' blob:; worker-src blob:; connect-src 'none'"
   }
 }

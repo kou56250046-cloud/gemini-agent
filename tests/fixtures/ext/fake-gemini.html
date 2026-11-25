@@ -18,6 +18,13 @@
   window.__sent = [];
   const tool = (name, args) => ({ code: "tool", text: JSON.stringify({ tool: name, args }) });
   function script(t) {
+    // 議事録（会議タブから）
+    if (t.startsWith("【議事録の部分")) return [{ code: "markdown", text: "- 話題：[00:00:00] 受注の見直し — 締め日を決めた\n- 決定：締め日は月末" }];
+    if (t.startsWith("【議事録：まとめ】")) return [
+      { code: "markdown", text: "# 定例（ダミー） 議事録\n## 2. 目的と結論\n- 締め日を月末に決めた\n## 3. 決定事項\n| No | 決定 | 決めた人・根拠の時刻 |\n|---|---|---|\n| 1 | 締め日は月末 | 山田 [00:00:04] |\n## 4. 宿題\n| No | 内容 | 担当 | 期限 |\n|---|---|---|---|\n| 1 | 画面案 | 佐藤 | 【要確認】 |" },
+      { code: "memo", text: "D-01 締め日は月末（会議）\nQ-01 画面案の期限は？（決める人：佐藤／期限：2026-12-05）" },
+      { code: "table", text: "| No | 内容 | 担当 | 期限 | 状態 |\n|---|---|---|---|---|\n| 1 | 画面案 | 佐藤 | 【要確認】 | 未着手 |" },
+    ];
     if (t.includes("【gemini-agent 拡張")) return [{ p: "【段階 1/7｜WBS｜待ってください】" }, { p: "まず資料を見ます。" }, tool("list_dir", {})];
     if (t.startsWith("【ツール結果｜list_dir｜成功】")) return [{ p: "議事録を読みます。" }, tool("read_file", { path: "資料/議事録.txt" })];
     if (t.startsWith("【ツール結果｜read_file｜成功】") && t.includes("締め日")) return [{ p: "工数を計算します。" }, tool("run_js", { code: "return input.a * input.b", input: { a: 6, b: 7 } })];

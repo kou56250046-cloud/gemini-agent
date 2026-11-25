@@ -13,6 +13,8 @@
     content: "message-content .markdown, .model-response-text .markdown, message-content, .markdown",
     codeBlock: "code-block, .code-block",
     codeLang: ".code-block-decoration span, .code-block-decoration, .code-lang, [data-lang]",
+    // Gem の編集画面の「指示」欄
+    gemInstructions: 'textarea[aria-label*="指示"], textarea[aria-label*="Instructions" i], textarea[formcontrolname="instructions"], [contenteditable="true"][aria-label*="指示"], [data-ga-gem-instructions]',
   };
   let SEL = Object.assign({}, DEFAULT);
   const loadSel = () => new Promise((res) => {
@@ -85,6 +87,53 @@
     return { ok: false, error: started ? "応答が終わりません（時間切れ）" : "応答が始まりません（送信できたか画面で確かめてください）", text: last };
   }
 
+  // 欄の中身を置き換える（textarea は value＋input イベント、contenteditable は insertText）
+  function setField(el, text) {
+    el.focus();
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+      const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value").set;
+      set.call(el, text);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      document.execCommand("selectAll", false, null);
+      document.execCommand("delete", false, null);
+      if (!document.execCommand("insertText", false, text)) { el.textContent = text; el.dispatchEvent(new InputEvent("input", { bubbles: true })); }
+    }
+  }
+
+  // スラッシュコマンド：入力欄が「/仕様」などだけのとき Tab で決まった文にする。一覧はパネルが chrome.storage.local「commands」に入れる
+  let COMMANDS = {};
+  const loadCommands = () => { try { chrome.storage.local.get("commands", (v) => { COMMANDS = (v && v.commands) || {}; }); } catch (e) { /* 無視 */ } };
+  loadCommands();
+  try { chrome.storage.onChanged.addListener((ch) => { if (ch.commands) COMMANDS = ch.commands.newValue || {}; }); } catch (e) { /* 無視 */ }
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab" || e.shiftKey || e.isComposing) return;
+    const box = q(SEL.input);
+    if (!box || !(box === e.target || box.contains(e.target))) return;
+    const cur = (box.tagName === "TEXTAREA" ? box.value : box.innerText).trim();
+    const m = cur.match(/^\/(\S+)$/);
+    if (!m || !COMMANDS[m[1]]) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const v = COMMANDS[m[1]];
+    // 案件メモの要約が要るもの（/引き継ぎ）は、storage に入れず、その場でサイドパネルに問い合わせる
+    if (/^@@gemini-agent:/.test(v)) {
+      chrome.runtime.sendMessage({ type: "ga-handover" }).then((r) => setField(box, r && r.ok ? r.text : "（サイドパネルを開いてから、もう一度 /引き継ぎ を使ってください）"), () => setField(box, "（サイドパネルを開いてから、もう一度 /引き継ぎ を使ってください）"));
+      return;
+    }
+    setField(box, v);
+  }, true);
+
+  // Gem の編集画面の指示欄に流し込む。保存ボタンは押さない（人が確かめて押す）
+  function gemFill(text) {
+    const box = q(SEL.gemInstructions);
+    if (!box) return { ok: false, error: "Gem の指示の欄が見つかりません（Gem の編集画面を開いてください。または設定のセレクタ gemInstructions を確かめてください）" };
+    setField(box, text);
+    const now = box.tagName === "TEXTAREA" ? box.value : box.innerText;
+    return { ok: now.replace(/\s+/g, "") === String(text).replace(/\s+/g, ""), chars: now.length };
+  }
+
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (!msg || msg.to !== "gemini") return false;
     (async () => {
@@ -93,7 +142,13 @@
         if (msg.op === "ping") return reply({ ok: true });
         if (msg.op === "selftest") return reply(selftest());
         if (msg.op === "last") return reply({ ok: true, text: toMd(lastResponse()) });
-        if (msg.op === "ask") return reply(await ask(String(msg.text || ""), msg.timeoutMs));
+        if (msg.op === "ask") {
+          // 2 つ目の依頼は断る（入力欄を書き換えて、前の依頼の応答を取り違えないように）
+          if (window.__gaAsking) return reply({ ok: false, error: "前の依頼の応答を待っています。終わってから送ってください" });
+          window.__gaAsking = true;
+          try { return reply(await ask(String(msg.text || ""), msg.timeoutMs)); } finally { window.__gaAsking = false; }
+        }
+        if (msg.op === "gemfill") return reply(gemFill(String(msg.text || "")));
         reply({ ok: false, error: "知らない依頼です：" + msg.op });
       } catch (e) { reply({ ok: false, error: e.message }); }
     })();

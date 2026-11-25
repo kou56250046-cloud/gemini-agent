@@ -142,6 +142,99 @@ try {
       await tryIt({ tool: "write_file", args: { path: "資料/上書き.txt", content: "x" } }),
       await tryIt({ tool: "read_file", args: { path: "資料/a.pdf" } }),
     ];`);
+
+  // ---------- 弾4 ----------
+  // 監査ログ：検証に通る・段階の到達・本文が入っていない・会話アーカイブの sha256 と一致する
+  result.audit = await panel.ev(`
+    const T = GK.runnerUI.test;
+    await T.flushAudit();
+    const files = T.state.fs.files;
+    const dec = (k) => new TextDecoder().decode(files.get(k));
+    const auditKeys = [...files.keys()].filter((k) => k.startsWith("case/audit/"));
+    const text = auditKeys.map(dec).join("");
+    const v = await GK.audit.verify(text);
+    const rows = GK.audit.parseLines(text).rows;
+    const recv = rows.find((r) => r.action === "受信" && r.sha256);
+    const archKey = [...files.keys()].find((k) => k.startsWith("case/会話/") && dec(k).includes("sha256: " + recv.sha256));
+    let archOk = false;
+    if (archKey) {
+      const t = dec(archKey); const i = t.indexOf("sha256: " + recv.sha256); const part = t.slice(t.lastIndexOf("\\n## ", i) + 1);
+      const m = part.match(/\\n(\`{3,})text\\n([\\s\\S]*?)\\n\\1\\n/); archOk = !!m && (await GK.audit.sha256(m[2])) === recv.sha256;
+    }
+    // 1 行書き換えると検証で見つかる
+    const tampered = text.replace(/"chars":(\\d+)/, (s, n) => '"chars":' + (Number(n) + 1));
+    await GK.auditUI.refresh();
+    return { ok: v.ok, rows: v.count, errors: v.errors.slice(0, 2), stages: GK.audit.progress(rows).stages.map((s) => s.stage), actions: [...new Set(rows.map((r) => r.action))],
+      hasBody: /締め日|受注は月/.test(text), archive: !!archKey, archOk, tamperFound: !(await GK.audit.verify(tampered)).ok, auditTabRows: document.querySelectorAll('#audit-root .au-table tr').length };`);
+
+  // 会議：Meet の字幕を記録 → 文字起こし → 議事録（ダミーの Gemini）→ 保存と案件メモ
+  const meet = await connect(await open(`http://127.0.0.1:${SITE}/fake-meet.html`));
+  result.meeting = await panel.ev(`
+    const T = GK.runnerUI.test;
+    await GK.meetUI.start();
+    return { recording: !!GK.meetUI.state.rec };`);
+  await meet.ev(`window.__playCaptions(); return true;`);
+  await sleep(7500);
+  Object.assign(result.meeting, await panel.ev(`
+    const T = GK.runnerUI.test;
+    await GK.meetUI.stop();
+    const lines = GK.meetUI.state.prep ? GK.meetUI.state.prep.stats.list.map((s) => s.speaker + ":" + s.count) : [];
+    await GK.meetUI.makeMinutes();
+    await T.flushAudit();
+    const keys = [...T.state.fs.files.keys()].filter((k) => k.startsWith("資料/議事録/"));
+    const dec = (k) => new TextDecoder().decode(T.state.fs.files.get(k));
+    const tr = keys.find((k) => k.endsWith("_文字起こし.md"));
+    return { files: keys.map((k) => k.replace(/^資料\\/議事録\\/\\d{8}-\\d{4}_/, "")), speakers: lines, transcript: tr ? dec(tr).split("\\n").filter((l) => l.startsWith("[")) : [],
+      minutesHasStats: keys.some((k) => k.endsWith("_議事録.md") && dec(k).includes("発言の量")), decisions: T.state.note.decisions.map((d) => d.text) };`));
+
+  // 質問箱：質問 2 つ → 新規は自動で入る → 聞き直しで更新が保留 → 反映
+  result.qa = await panel.ev(`
+    const T = GK.runnerUI.test;
+    await GK.qaUI.load();
+    const r1 = await GK.qaUI.ask("締め日は？\\n上限は？");
+    const after1 = GK.qaUI.db.items.map((x) => x.id + ":" + x.status);
+    await GK.qaUI.reask(["Q-001"]);
+    const pend = GK.qaUI.pending.reduce((s, t) => s + t.updates.length, 0);
+    const before = GK.qaUI.db.items.find((x) => x.id === "Q-001").status;
+    await GK.qaUI.decide({ ["0:" + GK.qaUI.pending[0].updates[0]]: "apply" });
+    const after = GK.qaUI.db.items.find((x) => x.id === "Q-001").status;
+    return { added: r1 && r1.added, after1, pending: pend, before, after, saved: T.state.fs.files.has("case/qa.json") };`);
+
+  // Gem の編集画面：指示の欄に流し込み、保存ボタンは押さない
+  const gemEdit = await connect(await open(`http://127.0.0.1:${SITE}/fake-gemini-gem-edit.html`));
+  result.gem = await panel.ev(`
+    const tabs = await chrome.tabs.query({});
+    const t = tabs.find((x) => /gem-edit/.test(x.url));
+    await GK.agent.ensureContent(t.id, "gemini");
+    const body = GK.ITEMS.find((x) => x.id === "gem-conductor").body;
+    const r = await chrome.tabs.sendMessage(t.id, { to: "gemini", op: "gemfill", text: body });
+    return r;`);
+  Object.assign(result.gem, await gemEdit.ev(`return { head: document.querySelector("textarea").value.slice(0, 20), saved: window.__saved };`));
+
+  // レビューの直し：同じタブへの同時送信は順に並ぶ・HTML は書けない・実行中はフォルダを替えられない・/引き継ぎはその場で組み立てる
+  result.fixes = await panel.ev(`
+    const T = GK.runnerUI.test;
+    const tabs = await chrome.tabs.query({});
+    const g = tabs.find((x) => /fake-gemini\\.html/.test(x.url));
+    const [a, b] = await Promise.all([GK.agent.askTab(g.id, "gemini", "【議事録：まとめ】\\n同時 1"), GK.agent.askTab(g.id, "gemini", "【議事録の部分 1/2】\\n同時 2")]);
+    let html = "";
+    try { await T.execTool({ tool: "write_file", args: { path: "out/x.html", content: "<img src=x>" } }); html = "書けた"; } catch (e) { html = e.message.slice(0, 30); }
+    T.state.running = true;
+    const before = GK.agent.fs.name;
+    const r = await GK.runnerUI.test.pickLocked();
+    T.state.running = false;
+    const stored = await new Promise((res) => chrome.storage.local.get("commands", (v) => res(JSON.stringify(v.commands || {}))));
+    return { both: [/議事録/.test(a), /話題/.test(b)], html, locked: r, folderSame: GK.agent.fs.name === before, storedHasMemo: /受注は月|締め日/.test(stored), storedHandover: stored.includes("@@gemini-agent:") };`);
+
+  // ページの取り込み（右クリックから届く形で）・スラッシュコマンド
+  result.page = await panel.ev(`const r = await GK.runnerUI.test.savePage({ title: "社内ポータル（ダミー）", url: "http://127.0.0.1/portal", text: "お知らせ本文（ダミー）" }); return r;`);
+  result.slash = await gem.ev(`
+    const box = document.querySelector(".ql-editor");
+    box.focus(); box.textContent = "/仕様";
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 200));
+    return box.innerText.slice(0, 30);`);
+  await panel.shot("ext-panel-4.png");
 } finally {
   chrome.kill();
   server.close();

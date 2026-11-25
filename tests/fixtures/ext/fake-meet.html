@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>Meet - 定例（ダミー）</title></head>
+<body>
+<!-- 拡張の試験用。Meet の字幕の作り（字幕の領域・話者・文）だけを真似て、字幕が伸びたり話者が替わったりする。通信しない -->
+<div role="region" aria-label="字幕" id="cc"></div>
+<script>
+(function () {
+  "use strict";
+  const cc = document.getElementById("cc");
+  // [何ミリ秒後, 話者, 見えている文]。同じ話者の文は伸びていく（Meet の字幕と同じ）
+  const script = [
+    [300, "山田", "本日は"], [600, "山田", "本日は受注の"], [900, "山田", "本日は受注の見直しです"],
+    [1200, "佐藤", "締め日は"], [1500, "佐藤", "締め日は月末で"], [1800, "佐藤", "締め日は月末でよいですか"],
+    [4300, "山田", "はい、月末で決定します"], [4600, "山田", "はい、月末で決定します。画面案は佐藤さんお願いします"],
+  ];
+  const shown = new Map();
+  function draw() {
+    while (cc.firstChild) cc.removeChild(cc.firstChild);
+    for (const [sp, text] of shown) {
+      const item = document.createElement("div"); item.className = "nMcdL";
+      const s = document.createElement("div"); s.setAttribute("data-speaker", ""); s.textContent = sp;
+      const t = document.createElement("div"); t.setAttribute("data-text", ""); t.textContent = text;
+      item.append(s, t); cc.append(item);
+    }
+  }
+  window.__playCaptions = () => {
+    shown.clear(); draw();
+    for (const [ms, sp, text] of script) setTimeout(() => { if (shown.size > 1 && !shown.has(sp)) shown.delete([...shown.keys()][0]); shown.set(sp, text); draw(); }, ms);
+  };
+})();
+</script>
+</body>
+</html>

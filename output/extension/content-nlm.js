@@ -58,7 +58,12 @@
         await loadSel();
         if (msg.op === "ping") return reply({ ok: true });
         if (msg.op === "selftest") return reply({ ok: !!q(SEL.input), input: !!q(SEL.input), responses: qa(SEL.response).length, title: document.title });
-        if (msg.op === "ask") return reply(await ask(String(msg.text || ""), msg.timeoutMs));
+        if (msg.op === "ask") {
+          // 2 つ目の依頼は断る（入力欄を書き換えて、前の依頼の応答を取り違えないように）
+          if (window.__gaAsking) return reply({ ok: false, error: "前の依頼の応答を待っています。終わってから送ってください" });
+          window.__gaAsking = true;
+          try { return reply(await ask(String(msg.text || ""), msg.timeoutMs)); } finally { window.__gaAsking = false; }
+        }
         reply({ ok: false, error: "知らない依頼です：" + msg.op });
       } catch (e) { reply({ ok: false, error: e.message }); }
     })();

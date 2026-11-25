@@ -7,17 +7,30 @@
 - 文書・WBS・解説ページ・スライド・表
 
 配るものは 2 つ。
-- `output/gemini-agent.html`（1 枚。コピー＆ペーストで使う）
+- `output/gemini-agent.html`（1 枚。コピー＆ペーストで使う。右上のボタンで、この HTML と拡張の zip（埋め込み）を保存できる。公開は https://kou56250046-cloud.github.io/gemini-agent/ 。gh-pages ブランチ）
 - `output/extension/`（Chrome 拡張。サイドパネルに同じ画面と「エージェント」タブが出て、Gemini の画面を操作して自動で進める）
 
 gemini-kit（案件カルテ・要件定義書づくり）とは別のプロジェクト。
-部品（md / flow / slides / pptx / xlsx / dom）は gemini-kit から写したもので、こちらで直しても gemini-kit には反映されない。
+写した部品とその元（こちらで直しても元には反映されない）：
+- gemini-kit から：md / flow / slides / pptx / xlsx / dom / clean
+- qa-box から：parse / model と、その回答の形（items/03-qa-prompt.md）・テスト（tests/qa.test.mjs）
 
-計画の正：`~/.claude/plans/gemini-claude-code-gemini-notebooklm-valiant-lemon.md`（弾1〜3）
+計画の正：`~/.claude/plans/gemini-claude-code-gemini-notebooklm-valiant-lemon.md`（弾1〜4）
 仕様：
 - 弾1 司令塔・取り込み・Google への出口：`.claude/specs/conductor-export/requirements.md`
 - 弾2 構成図・論点マップ・WBS・解説ページ・Excel/VBA・案件メモ：`.claude/specs/new-artifacts/requirements.md`
 - 弾3 Chrome 拡張（エージェント）：`.claude/specs/agent-extension/requirements.md`
+- 弾4 監査ログ・質問箱・会議（Meet 字幕 → 議事録）・会話アーカイブ・スラッシュコマンド・Gem 更新・朝の確認・ページ取り込み：`.claude/specs/audit-and-tools/requirements.md`
+
+## 弾4 の決まり
+- 監査ログ（`case/audit/YYYY-MM.jsonl`）
+  - 本文を入れない。残してよい項目は audit.js の FIELDS だけ
+  - target はファイルの場所と種類だけ（質問の文を入れない）
+  - 前の行の hash につなぐ。書き込みは runnerui.js の auditQueue の 1 列だけで行う
+- 会話アーカイブ（`case/会話/`）：見出しの sha256 は、監査ログと同じ計算（GK.audit.sha256）
+- 別の会話から来た memo（議事録）は `GK.note.renumber` で番号を振り直してから入れる（同じ番号で上書きしない）。司令塔の memo は会話の中で番号が続くので、振り直さない
+- 質問箱：新しい質問は自動で入れ、既にある質問の更新は保留して選ばせる（qaflow.triage / applyNew / applyChosen）
+- 権限と host は manifest() とテスト（meeting.test.mjs）を一緒に直す
 
 ---
 
@@ -55,6 +68,13 @@ src/js/runner.js      エージェントの進め方（道具の使い方の文�
 src/js/preview.js     スライドのプレビュー（gemini-kit の app.js の写し）
 src/js/intakeui.js    取り込みタブと出口のボタン
 src/js/runnerui.js    エージェントタブ（拡張のときだけ）：Gemini のタブとのやり取り・道具の実行・ゲート・許可・案件フォルダ・状況の表示
+src/js/audit.js       監査ログ（封・検証・進み具合・CSV）。DOM 非依存
+src/js/clean.js       文字起こしの前処理（VTT・Teams・Meet・話者:本文。gemini-kit の写し）
+src/js/meetlog.js     字幕 → 確定した発言 → 文字起こし・発言量。DOM 非依存
+src/js/minutes.js     議事録の依頼文（長いときは分ける）と応答の組み立て。DOM 非依存
+src/js/parse.js model.js  質問箱（qa-box の写し）
+src/js/qaflow.js      質問箱の自動化（質問の分け方・送る文・新規と更新の振り分け・案件メモへ）。DOM 非依存
+src/js/qaui.js meetui.js auditui.js  質問箱・会議・監査のタブ（監査は拡張のときだけ）
 src/js/app.js         タブ・文書・図・スライド・表・WBS・解説ページ・Gem 設定・使い方の図（HELP_FLOW）
 src/ext/              拡張だけのファイル：background.js・domtomd.js（画面 → Markdown）・content-gemini.js・content-nlm.js・sandbox.html/js
 src/items/*.md        Gem の指示文（00 司令塔・01 レビュー）・知識ファイル（5x 記法・60/61 Excel・VBA・8x デザイン）
@@ -72,7 +92,8 @@ tools/fix-bom.mjs     見えない文字（U+FEFF・U+2028・U+2029）をエス�
 
 ```bash
 node build.mjs                    # output/gemini-agent.html と output/extension/
-node --test tests/agent.test.mjs tests/artifacts.test.mjs tests/runner.test.mjs   # テスト
+node --test tests/*.test.mjs        # テスト（agent・artifacts・runner・qa・meeting）
+node tools/publish.mjs            # 公開用フォルダ ../gemini-agent-pages（GitHub Pages）へ HTML だけを写す。そのフォルダでコミットし、このリポジトリの gh-pages ブランチへ push する
 node tools/ext-smoke.mjs          # 拡張の通し試験（Playwright の Chromium を使う。Google Chrome 137 以降は --load-extension を受け付けない）
 python -m http.server 8772 --bind 127.0.0.1   # output で実行。画面確認用（Playwright は file:// を開けない）
 ```
