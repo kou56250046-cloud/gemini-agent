@@ -25,6 +25,20 @@
       { code: "memo", text: "D-01 締め日は月末（会議）\nQ-01 画面案の期限は？（決める人：佐藤／期限：2026-12-05）" },
       { code: "table", text: "| No | 内容 | 担当 | 期限 | 状態 |\n|---|---|---|---|---|\n| 1 | 画面案 | 佐藤 | 【要確認】 | 未着手 |" },
     ];
+    // 計画モード → 計画 → 差し戻し → 承認 → 検索・読む・編集・選択肢・書ける場所の外・xlsx・docx・調査のまとめ（弾5）
+    const PLAN = "# 計画：締め日を直す\n## 目的\n- 締め日を月末にそろえる\n## 変更するファイル\n- 資料/仕様/a.md：締め日を月末に直す\n## 作るファイル\n- out/調査_締め日.md\n## やらないこと\n- 議事録は直さない";
+    if (t.includes("【試験：計画】")) return [{ p: "まず書いてみます。" }, tool("write_file", { path: "out/早すぎる.md", content: "x" })];
+    if (t.startsWith("【ツール結果｜write_file｜失敗】") && t.includes("計画モード")) return [{ p: "調べました。計画です。" }, { code: "plan", text: PLAN }];
+    if (t.startsWith("【計画への指摘】")) return [{ p: "直しました。" }, { code: "plan", text: PLAN + "\n## 確かめ方\n- 読み直して月末になっていること" }];
+    if (t.startsWith("【計画の承認】")) return [{ p: "探します。" }, tool("search", { query: "締め日", context: 1, ext: "md" })];
+    if (t.startsWith("【ツール結果｜search｜成功】")) return [{ p: "読みます。" }, tool("read_file", { path: "資料/仕様/a.md" })];
+    if (t.startsWith("【ツール結果｜read_file｜成功】") && t.includes("仕様（試験）")) return [tool("edit_file", { path: "資料/仕様/a.md", old: "締め日は未定", new: "締め日は月末" })];
+    if (t.startsWith("【ツール結果｜edit_file｜成功】")) return [tool("ask_user", { question: "議事録にも反映しますか？", options: [{ label: "反映する", detail: "議事録.txt も直す" }, { label: "反映しない" }], recommend: "反映する" })];
+    if (t.startsWith("【人の返事】反映する")) return [tool("edit_file", { path: "資料/議事録.txt", old: "締め日は未定", new: "締め日は月末" })];
+    if (t.startsWith("【ツール結果｜edit_file｜失敗】") && t.includes("書ける場所の外")) return [tool("edit_xlsx", { path: "資料/仕様/表.xlsx", cells: { B2: "月末" } })];
+    if (t.startsWith("【ツール結果｜edit_xlsx｜成功】")) return [tool("edit_docx", { path: "資料/仕様/文書.docx", old: "未定", new: "月末" })];
+    if (t.startsWith("【ツール結果｜edit_docx｜成功】")) return [tool("write_file", { path: "out/調査_締め日.md", content: "# 調査：締め日\n- 資料/仕様/a.md の 2 行目" })];
+    if (t.startsWith("【ツール結果｜write_file｜成功】") && t.includes("調査_締め日")) return [tool("done", { summary: "締め日を月末に直しました（ダミー）" })];
     if (t.includes("【gemini-agent 拡張")) return [{ p: "【段階 1/7｜WBS｜待ってください】" }, { p: "まず資料を見ます。" }, tool("list_dir", {})];
     if (t.startsWith("【ツール結果｜list_dir｜成功】")) return [{ p: "議事録を読みます。" }, tool("read_file", { path: "資料/議事録.txt" })];
     if (t.startsWith("【ツール結果｜read_file｜成功】") && t.includes("締め日")) return [{ p: "工数を計算します。" }, tool("run_js", { code: "return input.a * input.b", input: { a: 6, b: 7 } })];

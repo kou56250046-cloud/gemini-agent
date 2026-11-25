@@ -27,7 +27,9 @@ const EXT = path.join(ROOT, "output", "extension-test");
 // 2. ダミーの画面を配る
 const FIX = path.join(ROOT, "tests", "fixtures", "ext");
 const server = http.createServer((req, res) => {
-  const f = path.join(FIX, decodeURIComponent(req.url.split("?")[0]).replace(/^\/+/, ""));
+  // /fake-nlm/notebook/<名前> は本物と同じ形の URL。中身はどれも fake-nlm.html（ノートブックの取り違えを確かめる用）
+  const p = decodeURIComponent(req.url.split("?")[0]).replace(/^\/fake-nlm\/notebook\/[^/]+$/, "/fake-nlm.html");
+  const f = path.join(FIX, p.replace(/^\/+/, ""));
   if (!f.startsWith(FIX) || !fs.existsSync(f)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(fs.readFileSync(f));
@@ -63,7 +65,8 @@ async function connect(target) {
   const pending = new Map();
   ws.addEventListener("message", (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
   const send = (method, params = {}) => new Promise((r) => { const id = ++seq; pending.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
-  const ev = async (expr) => { const r = await send("Runtime.evaluate", { expression: `(async () => { ${expr} })()`, awaitPromise: true, returnByValue: true }); if (r.result.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 800)); return r.result.result.value; };
+  // 1 回の評価は 150 秒まで（止まったら、どの段で止まったかを出して終わる）
+  const ev = async (expr) => { const r = await Promise.race([send("Runtime.evaluate", { expression: `(async () => { ${expr} })()`, awaitPromise: true, returnByValue: true }), new Promise((_, no) => setTimeout(() => no(new Error("ページの評価が 150 秒で終わりませんでした：" + expr.trim().slice(0, 80))), 150000))]); if (r.error) throw new Error(JSON.stringify(r.error)); if (r.result.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 800)); return r.result.result.value; };
   const shot = async (name) => { const s = await send("Page.captureScreenshot", { format: "png" }); fs.mkdirSync(outDir, { recursive: true }); fs.writeFileSync(path.join(outDir, name), Buffer.from(s.result.data, "base64")); };
   return { ws, send, ev, shot };
 }
@@ -75,22 +78,26 @@ try {
   const panel = await connect(await open(`chrome-extension://${extId}/panel.html`));
   await panel.send("Emulation.setDeviceMetricsOverride", { width: 420, height: 900, deviceScaleFactor: 1, mobile: false });
   await sleep(1500);
+  console.error("…panelPage");
   result.panelPage = await panel.ev(`return { href: location.href, title: document.title, gk: typeof GK, scripts: [...document.scripts].map(x => x.src), body: document.body ? document.body.innerText.slice(0, 300) : "" };`);
   if (result.panelPage.gk !== "object") throw new Error(JSON.stringify(result.panelPage));
 
   // 1 本通す：段階 3 で止まる → 承認 → 成果物・メモ・ファイル → NotebookLM → done
+  console.error("…run");
   result.run = await panel.ev(`
     const T = GK.runnerUI.test;
     await T.useFs(T.memFs("ダミー案件", { "資料/議事録.txt": "第1回 打合せ（ダミー）\\n締め日は未定" }));
     T.state.settings.confirmWrite = false;
     T.state.settings.maxSteps = 20;
+    await T.setMode("exec"); // 弾1〜4 の流れは実行モードで通す（計画モードは最後に試す）
     const p = T.run("WBS を作りたい（ダミー）");
     let waited = 0;
     while (!T.state.gate && waited < 60000) { await new Promise(r => setTimeout(r, 250)); waited += 250; }
     const gated = !!T.state.gate;
     const gateText = document.querySelector('.ag-gate') ? document.querySelector('.ag-gate').innerText.slice(0, 80) : "";
     T.answerGate("承認します。進めてください。");
-    await p;
+    const fin0 = await Promise.race([p.then(() => "ok"), new Promise((r) => setTimeout(() => r("timeout"), 60000))]);
+    if (fin0 !== "ok") return { fin0, gate: (document.querySelector(".ag-gate") || {}).innerText, msg: document.querySelector("#agent-root .status").textContent, log: T.state.log.slice(-8).map((e) => e.action + " " + (e.tool || "") + (e.ok === false ? " 失敗" : "")) };
     const dec = (k) => new TextDecoder().decode(T.state.fs.files.get(k));
     const n = T.state.note;
     return {
@@ -103,10 +110,12 @@ try {
       status: dec("case/status.md").split("\\n").slice(0, 8).join("\\n"),
       msg: document.querySelector('#agent-root .status').textContent,
     };`);
+  console.error("…sentToGemini");
   result.sentToGemini = await gem.ev(`return window.__sent.map(t => t.split("\\n")[0].slice(0, 40));`);
   await panel.shot("ext-panel.png");
 
   // 手数の上限で止まる（2 手）
+  console.error("…maxSteps");
   result.maxSteps = await panel.ev(`
     const T = GK.runnerUI.test;
     T.state.firstSent = false; T.state.settings.maxSteps = 2;
@@ -115,6 +124,7 @@ try {
   await panel.ev(`GK.runnerUI.test.answerGate(null); return true;`).catch(() => {});
 
   // run_js：3 秒で打ち切る・通信できない・拡張の API に触れない
+  console.error("…runJs");
   result.runJs = await panel.ev(`
     const T = GK.runnerUI.test;
     const tryIt = async (code) => { try { return (await T.execTool({ tool: "run_js", args: { code } })).text; } catch (e) { return "失敗：" + e.message; } };
@@ -125,6 +135,7 @@ try {
       api: await tryIt("return typeof chrome === 'undefined' || !chrome.tabs ? '使えない' : '使える'"),
     };`);
   // 書き込みの許可：「許可しない」を押すと書かない
+  console.error("…approve");
   result.approve = await panel.ev(`
     const T = GK.runnerUI.test;
     T.state.settings.confirmWrite = true;
@@ -134,6 +145,7 @@ try {
     [...document.querySelectorAll('.ag-approve button')].find(x => x.textContent === "許可しない").click();
     return { card, result: await p, written: T.state.fs.files.has("out/許可の確認.md"), gateLeft: !!T.state.gate };`);
   // パスの検査（実行の口で）
+  console.error("…paths");
   result.paths = await panel.ev(`
     const T = GK.runnerUI.test;
     const tryIt = async (call) => { try { await T.execTool(call); return "通った"; } catch (e) { return e.message.slice(0, 40); } };
@@ -145,6 +157,7 @@ try {
 
   // ---------- 弾4 ----------
   // 監査ログ：検証に通る・段階の到達・本文が入っていない・会話アーカイブの sha256 と一致する
+  console.error("…audit");
   result.audit = await panel.ev(`
     const T = GK.runnerUI.test;
     await T.flushAudit();
@@ -169,6 +182,7 @@ try {
 
   // 会議：Meet の字幕を記録 → 文字起こし → 議事録（ダミーの Gemini）→ 保存と案件メモ
   const meet = await connect(await open(`http://127.0.0.1:${SITE}/fake-meet.html`));
+  console.error("…meeting");
   result.meeting = await panel.ev(`
     const T = GK.runnerUI.test;
     await GK.meetUI.start();
@@ -188,6 +202,7 @@ try {
       minutesHasStats: keys.some((k) => k.endsWith("_議事録.md") && dec(k).includes("発言の量")), decisions: T.state.note.decisions.map((d) => d.text) };`));
 
   // 質問箱：質問 2 つ → 新規は自動で入る → 聞き直しで更新が保留 → 反映
+  console.error("…qa");
   result.qa = await panel.ev(`
     const T = GK.runnerUI.test;
     await GK.qaUI.load();
@@ -202,6 +217,7 @@ try {
 
   // Gem の編集画面：指示の欄に流し込み、保存ボタンは押さない
   const gemEdit = await connect(await open(`http://127.0.0.1:${SITE}/fake-gemini-gem-edit.html`));
+  console.error("…gem");
   result.gem = await panel.ev(`
     const tabs = await chrome.tabs.query({});
     const t = tabs.find((x) => /gem-edit/.test(x.url));
@@ -212,6 +228,7 @@ try {
   Object.assign(result.gem, await gemEdit.ev(`return { head: document.querySelector("textarea").value.slice(0, 20), saved: window.__saved };`));
 
   // レビューの直し：同じタブへの同時送信は順に並ぶ・HTML は書けない・実行中はフォルダを替えられない・/引き継ぎはその場で組み立てる
+  console.error("…fixes");
   result.fixes = await panel.ev(`
     const T = GK.runnerUI.test;
     const tabs = await chrome.tabs.query({});
@@ -227,7 +244,9 @@ try {
     return { both: [/議事録/.test(a), /話題/.test(b)], html, locked: r, folderSame: GK.agent.fs.name === before, storedHasMemo: /受注は月|締め日/.test(stored), storedHandover: stored.includes("@@gemini-agent:") };`);
 
   // ページの取り込み（右クリックから届く形で）・スラッシュコマンド
+  console.error("…page");
   result.page = await panel.ev(`const r = await GK.runnerUI.test.savePage({ title: "社内ポータル（ダミー）", url: "http://127.0.0.1/portal", text: "お知らせ本文（ダミー）" }); return r;`);
+  console.error("…slash");
   result.slash = await gem.ev(`
     const box = document.querySelector(".ql-editor");
     box.focus(); box.textContent = "/仕様";
@@ -235,6 +254,132 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     return box.innerText.slice(0, 30);`);
   await panel.shot("ext-panel-4.png");
+
+  // UI レビューの直し：今日の確認の「回答済にする」・成果物は新しい版だけ・通知は不透明で上に出る
+  console.error("…ui");
+  result.ui = await panel.ev(`
+    const btn = [...document.querySelectorAll("#agent-root .ag-today button")].find((b) => b.textContent === "回答済にする");
+    const had = !!btn;
+    if (btn) { btn.click(); await new Promise((r) => setTimeout(r, 600)); }
+    const q1 = GK.agent.note.questions.find((q) => q.id === "Q-01");
+    const arts = [...document.querySelectorAll("#agent-root .ag-memo .ag-cols > div:last-child li")].map((li) => li.textContent);
+    const t = document.getElementById("toast");
+    t.className = "show"; t.textContent = "確認用の通知";
+    await new Promise((r) => setTimeout(r, 400));
+    const cs = getComputedStyle(t);
+    return { had, q1: q1 && q1.status, artsDup: new Set(arts.map((x) => x.replace(/^\\d{8}-\\d{4}_/, "").replace(/\\(\\d+\\)(?=\\.)/, ""))).size !== arts.length, arts: arts.length, toastOpacity: cs.opacity, toastTop: Math.round(t.getBoundingClientRect().top), stateLive: !!document.querySelector("#agent-root .ag-busy[role]") };`);
+  await panel.shot("ext-panel-5.png");
+
+  // 案件の設定.md：ノートブックが複数開いていても、登録した案件のノートブックへ送る
+  console.error("…links");
+  result.links = await panel.ev(`
+    const T = GK.runnerUI.test, ag = GK.agent;
+    const base = "http://127.0.0.1:${SITE}/fake-nlm/notebook/";
+    const a = await chrome.tabs.create({ url: base + "A", active: false });
+    const b = await chrome.tabs.create({ url: base + "B", active: false });
+    await ag.waitLoaded(a.id); await ag.waitLoaded(b.id);
+    let unregistered = "";
+    try { await ag.findCaseTab("notebooklm"); unregistered = "選んでしまった"; } catch (e) { unregistered = /どのノートブックか分かりません/.test(e.message) ? "止まった" : e.message; }
+    const saved = await T.saveLink("notebook", base + "B");
+    const fileText = new TextDecoder().decode(await ag.fs.read(["案件の設定.md"]));
+    const tB = await ag.findCaseTab("notebooklm");
+    const reply = await ag.askTab(tB.id, "notebooklm", "締め日はいつですか（ダミー）", 60000);
+    const badSaved = await T.saveLink("conductor", "https://evil.example.com/gem/x");
+    await chrome.tabs.remove(tB.id);
+    const n0 = (await chrome.tabs.query({})).length;
+    const tB2 = await ag.findCaseTab("notebooklm");
+    const n1 = (await chrome.tabs.query({})).length;
+    await T.flushAudit();
+    const names = (await ag.fs.list(["case", "audit"])).filter((x) => !x.dir).map((x) => x.name);
+    let auditText = "";
+    for (const nm of names) auditText += new TextDecoder().decode(await ag.fs.read(["case", "audit", nm]));
+    const linkRows = document.querySelectorAll("#agent-root .ag-links input").length;
+    await chrome.tabs.remove(a.id).catch(() => {}); await chrome.tabs.remove(tB2.id).catch(() => {});
+    return { unregistered, saved, fileHasB: fileText.includes(base + "B"), pickedB: tB.url.startsWith(base + "B"), replied: reply.length > 0, badSaved, reopened: tB2.url.startsWith(base + "B") && n1 === n0 + 1, auditNoUrl: !auditText.includes("/notebook/B"), auditHasRead: auditText.includes("案件の設定の読み込み"), linkRows, linkRowsNote: "URL 3 つ＋書ける場所" };`);
+  await panel.ev(`document.querySelector("#agent-root .ag-links").scrollIntoView(); return 1;`);
+  await panel.shot("ext-panel-links.png");
+
+  // 弾5：計画モード → 計画のカード（差し戻し・承認）→ 検索 → Shift_JIS のファイルの編集（差分の許可）→ 選択肢 → 書ける場所の外 → xlsx・docx → 調査のまとめ → 元に戻す
+  const waitGate = `const wait = async (sel) => { const t0 = Date.now(); while (!(T.state.gate && (!sel || document.querySelector(sel))) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 150)); return !!T.state.gate; };`;
+  // 前の段で NotebookLM のタブが前に出ている。パネルが裏に回ると Chrome がタイマーを 1 分おきに間引くので、前に戻す
+  await panel.send("Page.bringToFront");
+  console.error("…plan1");
+  result.plan1 = await panel.ev(`
+    const T = GK.runnerUI.test;
+    ${waitGate}
+    const xlsx = GK.gexport.xlsx([{ name: "表", rows: [["項目", "値"], ["締め日", "未定"]] }]);
+    const docx = GK.gexport.docx("# 仕様\\n\\n締め日は未定です。");
+    await T.useFs(T.memFs("編集の案件", {
+      "案件の設定.md": "# 案件の設定\\n書ける場所: 資料/仕様\\n",
+      "資料/仕様/a.md": GK.edit.encodeSjis("# 仕様（試験）\\r\\n締め日は未定\\r\\n"),
+      "資料/議事録.txt": "締め日は未定",
+      "資料/仕様/表.xlsx": xlsx,
+      "資料/仕様/文書.docx": docx,
+    }));
+    T.state.settings.confirmWrite = true; T.state.settings.maxSteps = 30;
+    await T.setMode("plan");
+    window.__p = T.run("【試験：計画】締め日を直す（ダミー）");
+    const ok = await wait(".ag-plan");
+    return { ok, card: !!document.querySelector(".ag-plan"), files: (document.querySelector(".ag-plan p.small:nth-of-type(2)") || {}).textContent || "", rejected: T.state.log.some((e) => e.tool === "write_file" && e.ok === false), planSaved: [...T.state.fs.files.keys()].filter((k) => k.startsWith("case/計画/")) };`);
+  await panel.shot("ext-plan.png");
+  console.error("…plan2");
+  result.plan2 = await panel.ev(`
+    const T = GK.runnerUI.test;
+    ${waitGate}
+    T.answerGate("確かめ方も足して");
+    await new Promise((r) => setTimeout(r, 300));
+    await wait(".ag-plan");
+    const revised = document.querySelector(".ag-plan-body").textContent.includes("確かめ方");
+    T.answerGate("承認");
+    await wait(".ag-approve .ag-diff");
+    const diff = [...document.querySelectorAll(".ag-approve .ag-diff > div")].map((d) => d.className + ":" + d.textContent);
+    return { revised, mode: T.state.settings.mode, planFiles: T.state.planFiles, diff, warn: !!document.querySelector(".ag-approve p.err") };`);
+  await panel.shot("ext-diff.png");
+  console.error("…plan3");
+  result.plan3 = await panel.ev(`
+    const T = GK.runnerUI.test;
+    ${waitGate}
+    document.querySelector(".ag-approve button.primary").click();
+    await wait(".ag-opts");
+    return { opts: [...document.querySelectorAll(".ag-opt")].map((b) => b.textContent), rec: (document.querySelector(".ag-opt.rec b") || {}).textContent };`);
+  await panel.shot("ext-options.png");
+  console.error("…plan4");
+  result.plan4 = await panel.ev(`
+    const T = GK.runnerUI.test;
+    ${waitGate}
+    document.querySelector(".ag-opt").click();
+    await new Promise((r) => setTimeout(r, 300));
+    const warns = [];
+    for (let i = 0; i < 3; i++) {
+      await wait(".ag-approve");
+      warns.push(((document.querySelector(".ag-approve p.err") || {}).textContent || "").slice(0, 30) + "｜" + document.querySelector(".ag-approve p:not(.ag-gate-h):not(.err)").textContent.slice(0, 40));
+      document.querySelector(".ag-approve button.primary").click();
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    const fin = await Promise.race([window.__p.then(() => "終わった"), new Promise((r) => setTimeout(() => r("終わらない"), 30000))]);
+    if (fin !== "終わった") return { fin, warns, gate: (document.querySelector(".ag-gate") || {}).innerText, log: T.state.log.slice(-6).map((e) => e.action + " " + (e.tool || "") + (e.ok === false ? " 失敗" : "")) };
+    const F = T.state.fs.files;
+    const a = GK.edit.decode(F.get("資料/仕様/a.md"));
+    const sheet = (await GK.xlsx.sheets(F.get("資料/仕様/表.xlsx")))[0].rows[1][1];
+    const docText = GK.runner.docxText(await GK.xlsx.entryText(GK.xlsx.entries(F.get("資料/仕様/文書.docx")), "word/document.xml"));
+    const research = new TextDecoder().decode(F.get("out/調査_締め日.md"));
+    const plans = [...F.keys()].filter((k) => k.startsWith("case/計画/")).map((k) => new TextDecoder().decode(F.get(k)).split("\\n")[0].slice(0, 12));
+    const hist = new TextDecoder().decode(F.get("case/編集履歴.jsonl")).trim().split("\\n").map((l) => JSON.parse(l).tool);
+    const outsideFail = T.state.log.some((e) => e.tool === "edit_file" && e.ok === false);
+    const minutes = new TextDecoder().decode(F.get("資料/議事録.txt"));
+    // 元に戻す：a.md を Shift_JIS の元の中身に戻す
+    await T.undoEdit(T.state.edits.find((r) => r.path === "資料/仕様/a.md" && r.tool === "edit_file"));
+    const undone = GK.edit.decode(F.get("資料/仕様/a.md"));
+    await T.flushAudit();
+    let auditText = "";
+    for (const k of F.keys()) if (k.startsWith("case/audit/")) auditText += new TextDecoder().decode(F.get(k));
+    const sent = await (async () => { const tabs = await chrome.tabs.query({}); return tabs.length; })();
+    return { warns, msg: document.querySelector("#agent-root .status").textContent, aEnc: a.enc, aEol: a.eol === "\\r\\n", aText: a.text.includes("締め日は月末"), sheet, docText: docText.includes("締め日は月末です"), researchFooter: research.includes("## 調べたファイル（gemini-agent が記録）") && research.includes("資料/仕様/a.md"), plans, hist, outsideFail, minutesKept: minutes === "締め日は未定",
+      undone: undone.enc === "sjis" && undone.text.includes("締め日は未定"), backups: [...F.keys()].filter((k) => k.startsWith("case/_控え/")).length, auditNoBody: !auditText.includes("締め日は未定") && !auditText.includes("確かめ方も足して"), auditPlan: ["計画の提出", "計画の差し戻し", "計画の承認", "元に戻す"].every((x) => auditText.includes(x)), editsUi: document.querySelectorAll("#agent-root .ag-edits li").length };`);
+  await panel.ev(`document.querySelector("#agent-root .ag-edits-box").open = true; document.querySelector("#agent-root .ag-edits-box").scrollIntoView(); return 1;`);
+  await panel.shot("ext-edits.png");
+  console.error("…sentPlan");
+  result.sentPlan = await gem.ev(`return window.__sent.filter((t) => /計画/.test(t)).map((t) => t.split("\\n")[0].slice(0, 30));`);
 } finally {
   chrome.kill();
   server.close();

@@ -105,7 +105,8 @@
     // エージェントの実行中は送らない（同じ Gemini の会話に議事録の依頼が混ざり、応答を取り違えるため）
     if (ag.running) { say("エージェントの実行中です。終わってから（または止めてから）議事録を作ってください", "err"); return; }
     const rq = MI().requests(S.prep, { title: U.title.value.trim() || S.title });
-    const tab = await ag.findTab("gemini");
+    let tab = null;
+    try { tab = await ag.findCaseTab("gemini"); } catch (e) { say(e.message, "err"); return; }
     if (!tab || !(await ag.ensureContent(tab.id, "gemini"))) { say("Gemini のタブ（議事録 Gem か司令塔 Gem）を開いてください", "err"); return; }
     const notes = [];
     let reply = "";

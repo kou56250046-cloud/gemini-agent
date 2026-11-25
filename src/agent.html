@@ -25,7 +25,8 @@ header.top h1 small { color: #C9D4E3; font-weight: normal; margin-left: 8px; fon
 .dl-box { margin-left: auto; display: flex; gap: 6px; }
 .dl-box button { min-height: 30px; padding: 0 10px; border: 1px solid #C9D4E3; border-radius: 6px; background: transparent; color: #fff; font-size: 12.5px; cursor: pointer; }
 .dl-box button:hover { background: rgba(255,255,255,.12); }
-.dl-box button.primary { background: var(--gold); border-color: var(--gold); color: #fff; }
+.dl-box button.primary { background: #7A5E00; border-color: #7A5E00; color: #fff; }
+.dl-box button.primary:hover { background: #8C6C00; }
 nav.tabs { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px; border-top: 1px solid rgba(255,255,255,.12); }
 nav.tabs button { background: none; border: 0; border-radius: 0; color: #C9D4E3; font: inherit; padding: 0 14px; min-height: 40px; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
 nav.tabs button:hover { color: #fff; }
@@ -46,9 +47,11 @@ textarea { width: 100%; resize: vertical; border: 1px solid var(--line); border-
 .mono { font-family: Consolas, "BIZ UDGothic", "MS Gothic", monospace; font-size: 13px; line-height: 1.5; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
 .tablewrap { overflow-x: auto; }
-#toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 8px; opacity: 0; transition: .2s; pointer-events: none; z-index: 100; max-width: 90vw; }
-#toast.show { opacity: 1; transform: translate(-50%, 0); }
-#toast.err { background: var(--err); }
+/* 通知：ログや入力欄に重ならないよう上に出す。不透明。マウスを乗せている間は消さず、押すと閉じる */
+#toast { position: fixed; left: 50%; top: calc(var(--head-h) + 8px); transform: translate(-50%, -12px); background: #1B1B1F; color: #fff; padding: 10px 18px; border-left: 4px solid var(--gold); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 0; visibility: hidden; transition: transform 240ms cubic-bezier(.16,1,.3,1), opacity 160ms linear, visibility 0s 240ms; z-index: 100; max-width: min(90vw, 560px); cursor: pointer; }
+#toast.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: transform 240ms cubic-bezier(.16,1,.3,1), opacity 160ms linear; }
+#toast.err { background: #8F0000; border-left-color: #FFB4B4; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 ul.msgs { list-style: none; padding: 0; margin: 8px 0; font-size: 13px; }
 ul.msgs li { padding: 3px 8px; border-left: 3px solid var(--line); margin-bottom: 3px; background: #fff; }
 li.err, .err { color: var(--err); border-color: var(--err); }
@@ -121,10 +124,46 @@ select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; ba
 .ag-list { margin: 0; padding-left: 1.2em; font-size: 12.5px; }
 .ag-list li.err { color: var(--err); }
 .ag-folder { font-size: 13px; }
-.ag-busy { margin: 6px 0; padding: 6px 10px; background: var(--d-hl); border-radius: 6px; font-size: 13px; }
+/* 状態帯：いまの状態と、直前の結果（止まった理由・次の一手）を 1 つの枠にまとめる。上辺のレールは段階（1〜7）の進み */
+.ag-statebox { margin: 8px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+.ag-statebox .status { margin: 0; padding: 6px 10px; border-top: 1px solid var(--line); }
+.ag-statebox .status:empty { display: none; }
+.ag-statebox .status.warn, .ag-statebox .status.err { font-weight: bold; border-left: 4px solid currentColor; }
+.ag-busy { position: relative; margin: 0; padding: 9px 10px 6px; background: var(--d-hl); font-size: 13px; overflow: hidden; }
+.ag-busy::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--navy); opacity: .45; transform-origin: 0 0; transform: scaleX(var(--stage, 0)); transition: transform 600ms cubic-bezier(.16,1,.3,1); }
+.ag-busy:not(.ag-st-idle)::after { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.9), transparent); animation: ga-sweep 1.6s linear infinite; }
+@keyframes ga-sweep { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+.ag-sec { color: var(--sub); font-weight: normal; }
+.ag-memo > summary { cursor: pointer; font-weight: bold; color: var(--navy); padding: 4px 0; }
+.ag-today .ag-list li { margin: 2px 0; }
+.badge { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px; font-size: 11.5px; font-weight: bold; line-height: 18px; }
+.badge.b-over { background: var(--err); color: #fff; }
+.badge.b-today { background: #6E4B00; color: #fff; }
+.badge.b-soon { background: #FFF1D6; color: #6E4B00; border: 1px solid #E5C77F; }
+.badge.b-close { background: #E6F2EC; color: var(--ok); border: 1px solid #9CCBB0; }
+.ag-close button { min-height: 26px; padding: 0 8px; font-size: 12px; margin-left: 4px; }
 .ag-gate { margin: 10px 0; padding: 12px 14px; background: #FFF8E8; border: 1px solid #E5C77F; border-left: 4px solid var(--gold); border-radius: 8px; }
 .ag-gate-h { margin: 0 0 4px; font-weight: bold; color: #6E4B00; }
 .ag-approve { background: #FDF1F0; border-color: #E9B4AE; border-left-color: var(--err); }
+/* 計画モード・選択肢・差分・編集の履歴 */
+.ag-mode { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
+.ag-mode-opt { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13px; cursor: pointer; min-height: 36px; }
+.ag-mode-opt:has(input:checked) { border-color: var(--navy); background: var(--d-hl); color: var(--navy); font-weight: bold; }
+.ag-plan { background: #F3F6FF; border-color: #B9C7F5; border-left-color: var(--navy); }
+.ag-plan .ag-gate-h { color: var(--navy); }
+.ag-plan-body { max-height: 360px; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
+.ag-opts { display: grid; gap: 6px; margin: 8px 0; }
+.ag-opt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; text-align: left; padding: 8px 12px; }
+.ag-opt .small { flex-basis: 100%; }
+.ag-opt.rec { border-color: var(--ok); }
+.ag-diff { max-height: 320px; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; font: 12px/1.5 Consolas, "BIZ UDGothic", monospace; }
+.ag-diff > div { padding: 0 8px; white-space: pre-wrap; word-break: break-all; }
+.ag-diff .d-add { background: #E6F2EC; color: #0F4D26; }
+.ag-diff .d-del { background: #FDECEA; color: #8F0000; text-decoration: line-through; text-decoration-color: rgba(143,0,0,.4); }
+.ag-diff .d-gap { color: var(--sub); text-align: center; background: #F3F5F8; }
+.ag-edits-box { margin: 10px 0; }
+.ag-edits-box > summary { cursor: pointer; font-weight: bold; color: var(--navy); }
+.ag-edits li button { margin-left: 8px; }
 .ag-log li { font-size: 12px; }
 .ag-today { margin: 0 0 8px; padding: 8px 12px; background: #FFF8E8; border: 1px solid #E5C77F; border-radius: 6px; }
 .ag-busy.ag-st-idle { background: #F1F3F6; color: var(--sub); }
@@ -156,6 +195,27 @@ button.danger { color: var(--err); }
 .help { max-width: 1100px; }
 .help .lead { font-size: 15px; }
 .help ol li { margin-bottom: 4px; }
+/* 使い方：目次・3 つの使い方のカード・手順・フォルダの図 */
+.help-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; padding: 0; list-style: none; }
+.help-toc a { display: inline-block; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--navy); text-decoration: none; font-size: 13px; }
+.help-toc a:hover { border-color: var(--navy); }
+.help-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 12px 0; }
+.help-card { background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--navy); border-radius: 10px; padding: 12px 14px; }
+.help-card h4 { margin: 0 0 4px; color: var(--navy); font-size: 15px; }
+.help-card .who { margin: 0 0 6px; font-size: 12.5px; color: var(--sub); }
+.help-card ul { margin: 0; padding-left: 1.2em; font-size: 13px; }
+.help-card.c2 { border-top-color: #7A5E00; }
+.help-card.c3 { border-top-color: var(--ok); }
+ol.steps { list-style: none; counter-reset: st; padding: 0; margin: 8px 0; }
+ol.steps > li { counter-increment: st; position: relative; padding: 4px 0 8px 40px; margin: 0; }
+ol.steps > li::before { content: counter(st); position: absolute; left: 0; top: 2px; width: 28px; height: 28px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: bold; text-align: center; line-height: 28px; font-size: 13px; }
+ol.steps > li > b:first-child { display: block; }
+.help .note { background: #FFF8E8; border: 1px solid #E5C77F; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin: 8px 0; }
+.help .tip { background: var(--d-hl); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin: 8px 0; }
+.help pre.tree { background: #F3F5F8; border-radius: 8px; padding: 10px 12px; font: 12.5px/1.6 Consolas, "BIZ UDGothic", monospace; white-space: pre; overflow-x: auto; margin: 8px 0; }
+.help .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.help h3 { scroll-margin-top: calc(var(--head-h) + 8px); }
+.help kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: #fff; font-size: 12px; }
 #help-flow svg { display: block; width: 100%; height: auto; min-width: 960px; }
 
 /* サイドパネル（幅 520px 以下）：上のバーを固定せず、タブを小さくして作業の場所を広く取る */
@@ -163,8 +223,14 @@ button.danger { color: var(--err); }
   header.top { position: static; }
   header.top .top-in { padding: 0 10px; }
   header.top h1 small { display: none; }
-  nav.tabs button { padding: 0 9px; min-height: 34px; font-size: 13px; }
+  nav.tabs button { padding: 0 9px; min-height: 40px; font-size: 13px; }
   main { padding: 12px 10px; }
+  #toast { top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #toast, #toast.show { transition: opacity 160ms linear, visibility 0s; transform: translate(-50%, 0); }
+  .ag-busy::before { transition: none; }
+  .ag-busy::after { display: none; }
 }
 @media (max-width: 860px) {
   .work { grid-template-columns: 1fr; }
@@ -331,97 +397,231 @@ button.danger { color: var(--err); }
 
 <section class="tab" id="tab-help" role="tabpanel" aria-labelledby="tabbtn-help" hidden>
   <div class="help">
-  <h2>使い方：司令塔から始める</h2>
-  <p class="lead">何から始めればよいか迷ったら、司令塔 Gem に「やりたいこと」を話します。司令塔が型（理解・アイデア出し・資料・構成図・WBS・Excel/VBA・HTML）を判定し、
-  <b>受付 → ヒヤリング → 仕様（ここだけ承認） → 作成 → 自己点検 → 修正 → 仕上げ</b>の 7 段階で進めます。応答の 1 行目に「段階・型・次に人がすること」が出ます。</p>
+  <h2>使い方</h2>
+  <p class="lead">Gemini（Gem）と NotebookLM だけで、Claude Code のように<b>段階を踏んで</b>案件を進めるための道具です。
+  司令塔 Gem が <b>受付 → ヒヤリング → 仕様（ここだけ承認） → 作成 → 自己点検 → 修正 → 仕上げ</b> の 7 段階で進め、このツールが応答を決まった見た目のファイル（文書・図・WBS・表・スライド・解説ページ）にします。</p>
+  <ul class="help-toc" aria-label="目次">
+    <li><a href="#h-start">3 つの使い方</a></li>
+    <li><a href="#h-prep">準備（最初の 1 回）</a></li>
+    <li><a href="#h-html">HTML だけで使う</a></li>
+    <li><a href="#h-ext">拡張で自動にする</a></li>
+    <li><a href="#h-folder">案件フォルダ</a></li>
+    <li><a href="#h-plan">計画モード</a></li>
+    <li><a href="#h-edit">ファイルを直す・調べる</a></li>
+    <li><a href="#h-tabs">タブごとの役割</a></li>
+    <li><a href="#h-google">Google への出口</a></li>
+    <li><a href="#h-trouble">困ったとき</a></li>
+    <li><a href="#h-rule">守ること</a></li>
+  </ul>
+
   <div class="fig">
+    <h3 id="h-start">3 つの使い方（どれから始めてもよい）</h3>
+    <div class="help-cards">
+      <div class="help-card">
+        <h4>① HTML だけ</h4>
+        <p class="who">拡張を入れられない・まず試したいとき</p>
+        <ul><li>Gem の応答をコピーして「取り込み」タブに貼る</li><li>図・文書・表が見分けられ、書き出しのボタンが出る</li><li>何も入れなくてよい（この HTML を開くだけ）</li></ul>
+      </div>
+      <div class="help-card c2">
+        <h4>② Chrome 拡張で自動</h4>
+        <p class="who">毎日の案件を、コピペなしで回したいとき</p>
+        <ul><li>依頼を書いて押すだけ。送信・回収・保存を自動で繰り返す</li><li>人の判断が要る所（仕様の承認・質問・書き込み）でだけ止まる</li><li>ファイルの横断検索・編集もできる</li></ul>
+      </div>
+      <div class="help-card c3">
+        <h4>③ 会議・質問箱</h4>
+        <p class="who">議事録や、資料への質問をまとめたいとき</p>
+        <ul><li>Meet の字幕 → 文字起こし → 議事録・宿題の表</li><li>NotebookLM への質問と回答を、状態つきで管理</li><li>決まったこと・未回答の質問は案件メモへ</li></ul>
+      </div>
+    </div>
     <h3>全体の流れ</h3>
     <div id="help-flow"></div>
   </div>
+
   <div class="fig">
-    <h3>準備（最初の 1 回）</h3>
-    <ol>
-      <li>Gem 設定タブの「司令塔 Gem」の指示文を、Gem の「カスタム指示」に貼る。知識ファイル（フロー記法・スライド JSON・配置と情報量・図表の選び方）を .md で保存して「知識」に入れる</li>
-      <li>同じように「レビュー Gem」も作る</li>
-      <li>案件の資料は NotebookLM のノートブックにまとめておき、会話ごとに添付する（または会話にノートブックを追加する）</li>
-    </ol>
-    <h3>毎回の流れ</h3>
-    <ol>
-      <li>司令塔 Gem に依頼と資料を渡す。質問には選択肢で答える（「全部仮置きで進めて」でもよい）</li>
-      <li>段階 3 の仕様（背景・受入条件・非目標・成果物・確かめ方）を読み、「承認」か直す点を返す</li>
-      <li>応答を丸ごとコピーし、<b>取り込み</b>タブに貼る。図・文書・表・スライドが見分けられ、行き先と書き出しのボタンが出る</li>
-      <li>段階 5 で出たレビュー依頼文を、観点ごとに新しいチャットでレビュー Gem に渡す。指摘の表を司令塔に返して直させる</li>
-      <li>直したいときは同じ会話で指示する。変えた節だけが返る</li>
+    <h3 id="h-prep">準備（最初の 1 回）</h3>
+    <ol class="steps">
+      <li><b>司令塔 Gem を作る</b>「Gem 設定」タブの「司令塔 Gem」の指示文を、Gem の「カスタム指示」に貼る。知識ファイル（フロー記法・スライド JSON など）を .md で保存し、Gem の「知識」に入れる</li>
+      <li><b>レビュー Gem も作る</b>同じタブの「レビュー Gem」で、同じように作る（自己点検の段階で使う）</li>
+      <li><b>資料を NotebookLM にまとめる</b>案件の資料はノートブックに入れておく。会話に添付するか、拡張なら NotebookLM に直接質問させる</li>
+      <li><b>（拡張を使うなら）拡張を入れる</b>下の「拡張で自動にする」の手順で入れる</li>
     </ol>
   </div>
+
   <div class="fig">
-    <h3>Google への出口</h3>
+    <h3 id="h-html">HTML だけで使う（毎回の流れ）</h3>
+    <ol class="steps">
+      <li><b>司令塔 Gem に依頼と資料を渡す</b>質問には選択肢で答える。「全部仮置きで進めて」でもよい</li>
+      <li><b>段階 3 の仕様を承認する</b>背景・受入条件・非目標・成果物・確かめ方を読み、「承認」か直す点を返す</li>
+      <li><b>応答を「取り込み」タブに貼る</b>丸ごとコピーして貼ると、図・文書・表・スライドが見分けられ、行き先と書き出しのボタンが出る</li>
+      <li><b>レビューと修正</b>段階 5 のレビュー依頼文を、観点ごとに新しいチャットでレビュー Gem に渡す。指摘の表を司令塔に返して直させる</li>
+    </ol>
+    <p class="tip">直したいときは同じ会話で指示すると、変えた節だけが返ります。応答の 1 行目に「段階・型・次に人がすること」が出るので、迷ったらそこを見ます。</p>
+  </div>
+
+  <div class="fig" id="help-ext">
+    <h3 id="h-ext">Chrome 拡張で自動にする</h3>
+    <p>拡張を入れると、Gemini の画面の横（サイドパネル）にこの画面が出て「エージェント」「監査」タブが増えます。</p>
+    <div class="two">
+      <div>
+        <h4>入れ方（最初の 1 回）</h4>
+        <ol class="steps">
+          <li><b>zip を保存して展開</b>右上の「Chrome 拡張をダウンロード」→ 展開した <code>gemini-agent-extension</code> フォルダを PC に置く（場所は変えない）</li>
+          <li><b>デベロッパー モードをオン</b>Chrome で <code>chrome://extensions</code> を開き、右上のスイッチを入れる</li>
+          <li><b>読み込む</b>「パッケージ化されていない拡張機能を読み込む」でそのフォルダを選ぶ</li>
+          <li><b>固定して開く</b>パズルの印から「Gemini エージェント」を固定し、押すとサイドパネルが開く</li>
+        </ol>
+        <p class="tip">新しい版は同じ場所に上書きし、拡張機能の画面で「再読み込み」を押します。</p>
+      </div>
+      <div>
+        <h4>毎回の使い方</h4>
+        <ol class="steps">
+          <li><b>案件フォルダを選ぶ</b>次からは自動で開く（許可を 1 回押すだけ）</li>
+          <li><b>モードを選ぶ</b>迷ったら「計画（読むだけ）」。調べて計画を出させ、承認してから書かせる</li>
+          <li><b>依頼を書いて「送って進める」</b>例：「資料/仕様 の締め日の記載を、議事録の決定に合わせて直して」</li>
+          <li><b>止まったら答える</b>黄色の枠＝質問、青の枠＝計画の承認、赤の枠＝書き込みの許可（差分を見て押す）</li>
+        </ol>
+      </div>
+    </div>
+    <h4>パネルの見方（上から順に）</h4>
+    <div class="tablewrap"><table>
+      <tr><th>場所</th><th>何が分かるか</th></tr>
+      <tr><td>状態の帯</td><td>いま何をしているか（送信中・生成中・道具・許可待ち）と経過秒。上の細い線が段階 1〜7 の進み。止まった理由と次にすることもここに出る</td></tr>
+      <tr><td>今日の確認</td><td>期限切れ・今日まで・3 日以内の質問、会議の決定で答えが出ていそうな質問（「回答済にする」で閉じられる）、進んでいない日数</td></tr>
+      <tr><td>モード・依頼・送るボタン</td><td>毎回使う所。スクロールせずに届く位置にある</td></tr>
+      <tr><td>案件メモ</td><td>段階・次に人がすること・未回答の質問・決まったこと・成果物（新しい版だけ）・リンクと書ける場所</td></tr>
+      <tr><td>編集の履歴</td><td>Gemini が直したファイルの一覧。「元に戻す」で控えに戻せる</td></tr>
+      <tr><td>実行ログ・設定</td><td>手ごとの記録（本文は残さない）、上限の手数・通知の時刻・セレクタなど</td></tr>
+    </table></div>
+  </div>
+
+  <div class="fig">
+    <h3 id="h-folder">案件フォルダ（1 案件 = 1 フォルダ）</h3>
+    <p>案件フォルダは、拡張が<b>記録を書き、次の日に読み返す場所</b>です。選んでおくと、前回の続きから始められ、成果物が自動で溜まり、Gemini が資料を直接読めます。中身はこのフォルダにだけ書き、ブラウザや外部には残しません。</p>
+    <div class="two">
+<pre class="tree">案件フォルダ/
+├─ 案件の設定.md    ← 人が書く（リンク・書ける場所）
+├─ 資料/            ← 人が置く。Gemini は読める
+│   ├─ 議事録/      ← 会議の文字起こし・議事録
+│   └─ 取り込み/    ← 右クリックで保存したページ
+├─ out/             ← 成果物（自動で保存）
+└─ case/            ← 拡張の記録（触らなくてよい）
+    ├─ note.json・status.md  案件メモ・今の状況
+    ├─ 計画/          承認した・差し戻した計画
+    ├─ 編集履歴.jsonl・_控え/  編集の記録と控え
+    ├─ audit/         監査ログ（本文なし）
+    └─ 会話/          会話の控え（設定で止められる）</pre>
+      <div>
+        <h4>案件の設定.md（メモ帳で書ける）</h4>
+<pre class="tree">NotebookLM: https://notebooklm.google.com/notebook/…
+司令塔 Gem: https://gemini.google.com/gem/…
+レビュー Gem: https://gemini.google.com/gem/…
+書ける場所: 資料/仕様, src</pre>
+        <ul class="small">
+          <li><b>NotebookLM</b>：この案件のノートブックに送る。開いていなければ開いてから送る。未登録でノートブックを 2 つ以上開いていると、取り違えないよう止まる</li>
+          <li><b>司令塔 Gem・レビュー Gem</b>：案件ごとの Gem。未登録ならパネルの設定の値を使う</li>
+          <li><b>書ける場所</b>：Gemini にファイルを直させてよいフォルダ。<code>out/</code> はいつでも書ける。<code>case/</code> は書けない</li>
+        </ul>
+        <p class="tip">案件メモの「リンク」欄に入れても、このファイルの該当の行が書き換わります（ほかの行はそのまま）。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="fig">
+    <h3 id="h-plan">計画モード（まず計画、承認してから実行）</h3>
+    <p>Claude Code の plan mode と同じ考え方です。<b>計画モードでは Gemini は読むだけ</b>で、書く道具は拡張が拒みます（Gemini の約束事に頼りません）。</p>
+    <ol class="steps">
+      <li><b>「計画（読むだけ）」で依頼する</b>Gemini はファイルの一覧・検索・読み込み・NotebookLM への質問だけで調べる</li>
+      <li><b>計画のカードが出る</b>目的・調べたこと・<b>変更するファイル</b>・作るファイル・やらないこと・確かめ方・戻し方。<code>case/計画/</code> にも保存される</li>
+      <li><b>承認するか、直してほしい点を送る</b>「承認して実行」で実行モードに切り替わる。「直してほしい点を送る」なら計画を出し直す。「やめる」で終わる</li>
+      <li><b>実行中は、書く前に毎回差分を見て許可</b>計画にないファイルを書こうとすると、許可の枠に赤で「計画にないファイル」と出る</li>
+    </ol>
+    <h4>選択肢で答える（提案）</h4>
+    <p>方針が分かれる所では、Gemini が選択肢とおすすめを出します。ボタンを押すだけで返事になります。どれも違うときは、下の欄に書いて送ります。</p>
+    <div class="note">小さな作業（成果物を作るだけ）なら「実行」モードのままでかまいません。既存のファイルを直す・まとめて調べるときは「計画」から始めると安全です。</div>
+  </div>
+
+  <div class="fig">
+    <h3 id="h-edit">ファイルを直す・横断して調べる（拡張）</h3>
+    <div class="tablewrap"><table>
+      <tr><th>やりたいこと</th><th>Gemini が使う道具</th><th>決まり</th></tr>
+      <tr><td>フォルダの中を見る・読む</td><td>list_dir・read_file</td><td>txt・md・csv・json・xlsx・docx・ソースコードなど。PDF・pptx・画像は NotebookLM へ</td></tr>
+      <tr><td>横断して探す</td><td>search</td><td>部分一致か正規表現。種類の絞り込み（md,js）・前後の行・docx/xlsx の中も。多すぎるとファイルごとの件数だけを返す</td></tr>
+      <tr><td>文書・コードの一部を直す</td><td>edit_file</td><td>「この文をこの文に」で置き換え。<b>差分を見て許可</b>。文字コード（UTF-8・Shift_JIS）と改行は元のまま</td></tr>
+      <tr><td>Excel のセルの値を直す</td><td>edit_xlsx</td><td>値だけ。書式・グラフはそのまま。数式のセルは許したときだけ上書き。.xlsm（マクロ入り）は書き換えない</td></tr>
+      <tr><td>Word の文を直す</td><td>edit_docx</td><td>1 段落の中で、太字などの書式の境目をまたがない文だけ</td></tr>
+      <tr><td>新しいファイルを作る</td><td>write_file・render</td><td>out/ と「書ける場所」の中だけ。図・スライド・解説ページは render で決まった見た目に</td></tr>
+      <tr><td>計算する</td><td>run_js</td><td>隔離した場所で 3 秒まで。通信できない</td></tr>
+      <tr><td>資料に聞く・点検させる</td><td>ask_notebooklm・review</td><td>案件のノートブック／レビュー Gem（観点ごとに別のチャット）</td></tr>
+    </table></div>
+    <div class="two">
+      <div>
+        <h4>元に戻す</h4>
+        <p class="small">書き換える前の中身は <code>case/_控え/</code> に残り、「編集の履歴」の「元に戻す」で戻せます。戻す前の中身も控えに残すので、戻したことも戻せます。人が後から直していたら、戻す前に確認が出ます。</p>
+      </div>
+      <div>
+        <h4>横断の調査</h4>
+        <p class="small">「探す → 読む → まとめる」を繰り返し、結論を <code>out/調査_&lt;題&gt;.md</code> に書きます。末尾には、拡張が記録した<b>実際に読んだファイルと探した語</b>が自動で付きます（Gemini の申告ではなく記録が根拠）。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="fig">
+    <h3 id="h-tabs">タブごとの役割</h3>
+    <div class="tablewrap"><table>
+      <tr><th>タブ</th><th>使う場面</th></tr>
+      <tr><td>エージェント（拡張）</td><td>依頼を送って自動で進める。案件メモ・今日の確認・編集の履歴</td></tr>
+      <tr><td>取り込み</td><td>Gem の応答を貼って、成果物を見分けて書き出す（HTML だけのときの入口）</td></tr>
+      <tr><td>文書・図・スライド・表・WBS・解説ページ</td><td>取り込んだ成果物を個別に直す・書き出す。WBS は営業日で日程とクリティカルパスを引く</td></tr>
+      <tr><td>会議</td><td>Meet の字幕を記録（拡張）、または文字起こしを貼って、議事録・宿題の表を作る。記録してよいか、参加者に先に伝える</td></tr>
+      <tr><td>質問箱</td><td>NotebookLM への質問と回答を状態（確定・要確認・未確定・提案）つきで管理。新しい質問は自動で入り、回答が変わったときだけ差分を見て選ぶ</td></tr>
+      <tr><td>監査（拡張）</td><td>どこで・誰が・何を・どこまで進めたか。本文は入れず、書き換えは「検証」で分かる</td></tr>
+      <tr><td>Gem 設定</td><td>Gem の指示文と知識ファイル。拡張なら Gem の編集画面に流し込める（保存は人が押す）</td></tr>
+    </table></div>
+    <p class="tip">拡張では、Gemini の入力欄で <code>/仕様</code> <code>/続き</code> <code>/引き継ぎ</code> などのあとに <kbd>Tab</kbd> で定型文になります。右クリックの「このページを案件の資料に保存」で、見ているページを <code>資料/取り込み/</code> に保存できます。</p>
+  </div>
+
+  <div class="fig">
+    <h3 id="h-google">Google への出口</h3>
     <div class="tablewrap"><table>
       <tr><th>渡す先</th><th>ボタン</th><th>手順</th></tr>
       <tr><td>Google ドキュメント</td><td>Google ドキュメント用にコピー</td><td>新しいドキュメントに Ctrl+V。見出し・表・太字・フロー図（画像）が保たれる。崩れたら「.docx で保存」→ Drive にアップロード →「アプリで開く → Google ドキュメント」</td></tr>
       <tr><td>Google スプレッドシート</td><td>表をコピー／.xlsx で保存</td><td>コピーはセル A1 を選んで Ctrl+V。.xlsx は見出しの固定・フィルタ・罫線付き。Excel でもそのまま開ける</td></tr>
       <tr><td>Google スライド</td><td>Google スライド向けに保存</td><td>日本語を Noto Sans JP にした .pptx を Drive にアップロード →「アプリで開く → Google スライド」。PowerPoint で使うなら「PowerPoint で保存」</td></tr>
       <tr><td>NotebookLM</td><td>NotebookLM 用 .md</td><td>ソースに追加する。同じ名前の古いソースは先に削除する（古い版と混ざると回答が食い違う）</td></tr>
-      <tr><td>Excel（VBA）</td><td>コピー</td><td>Alt+F11 →［挿入］→［標準モジュール］に貼って F5。エラーが出たら、エラー文と止まった行を司令塔に貼る</td></tr>
+      <tr><td>Excel（VBA）</td><td>コピー／.bas</td><td>Alt+F11 →［挿入］→［標準モジュール］に貼って F5（.bas は［ファイルのインポート］）。エラーが出たら、エラー文と止まった行を司令塔に貼る</td></tr>
     </table></div>
-    <p class="muted small">Docs・Slides の右側の Gemini パネルが使える場合は、書き出した後の言い回しの調整をそこで行ってもよい。構成や表を変えるときは司令塔に戻して直す（中身がずれないように）。</p>
   </div>
-  <div class="fig" id="help-ext">
-    <h3>Chrome 拡張で自動にする（コピペ・管理・状況の把握を減らす）</h3>
-    <p>拡張を入れると、Gemini の画面の横（サイドパネル）にこの画面が出て、「エージェント」タブが増えます。依頼を書いて「送って進める」を押すと、送信・応答の回収・道具の実行・成果物の保存を自動で繰り返し、人の判断が要るところ（仕様の承認・質問）でだけ止まります。</p>
-    <h3>入れ方（最初の 1 回）</h3>
-    <ol>
-      <li>画面の右上の「Chrome 拡張をダウンロード」で zip を保存し、展開して <code>gemini-agent-extension</code> フォルダを PC に置く（場所を変えると読み込み直しが要る。新しい版は同じ場所に上書きして、拡張機能の画面で再読み込み）</li>
-      <li>Chrome で <code>chrome://extensions</code> を開き、右上の「デベロッパー モード」をオンにする</li>
-      <li>「パッケージ化されていない拡張機能を読み込む」で <code>gemini-agent-extension</code> フォルダを選ぶ</li>
-      <li>ツールバーのパズルの印から「Gemini エージェント」を固定し、押すとサイドパネルが開く</li>
-      <li>エージェントタブの「設定」に、司令塔 Gem とレビュー Gem の URL（Gem を開いたときのアドレス）を入れる</li>
-    </ol>
-    <h3>使い方</h3>
-    <ol>
-      <li>案件ごとにフォルダを作り、資料を <code>資料/</code> に入れる。「案件フォルダを選ぶ」で選ぶ（次からは自動で開く）</li>
-      <li>「司令塔 Gem を開く」→ 依頼を書いて「送って進める」</li>
-      <li>止まったら、黄色の枠の質問に答えるか「承認」を押す。書き込みの前は赤い枠で許可を聞く</li>
-      <li>成果物は <code>out/</code>、案件メモと状況は <code>case/</code> に自動で保存される（<code>case/status.md</code> を開けば今の状況が分かる）。パネルの上にも今の段階・次の一手・未回答の質問が出る</li>
-      <li>NotebookLM に聞くときは、ノートブックを別のタブで開いておく</li>
-    </ol>
+
+  <div class="fig">
+    <h3 id="h-trouble">困ったとき</h3>
     <div class="tablewrap"><table>
-      <tr><th>道具</th><th>できること</th></tr>
-      <tr><td>list_dir・read_file・search</td><td>案件フォルダの一覧・読み込み（txt・md・csv・json・xlsx・docx）・検索。フォルダの外は読めない</td></tr>
-      <tr><td>write_file・render</td><td><code>out/</code> にだけ書く。上書きの前に <code>out/_控え/</code> に控えを残す</td></tr>
-      <tr><td>run_js</td><td>計算だけを隔離した場所で実行（3 秒まで・通信できない）</td></tr>
-      <tr><td>ask_notebooklm</td><td>開いている NotebookLM に質問して、回答を受け取る</td></tr>
-      <tr><td>review</td><td>レビュー Gem を観点ごとに別のタブで開いて点検させる（最大 3 つ・互いの結果は見せない）</td></tr>
-      <tr><td>ask_user</td><td>人に聞く・承認を取る</td></tr>
+      <tr><th>こんなとき</th><th>こうする</th></tr>
+      <tr><td>送っても動かない</td><td>「つながりを確かめる」を押す。「入力欄が見つかりません」なら Gemini の画面の作りが変わっている。設定の「セレクタ」を直すまでは、応答をコピーして取り込みタブに貼る使い方ができる</td></tr>
+      <tr><td>途中で止まった</td><td>状態の帯の理由を読む。1 回の依頼は 20 手まで（設定で変更）、同じ道具の失敗が 3 回続くと止まる。続けるときはもう一度依頼を送る</td></tr>
+      <tr><td>「どのノートブックか分かりません」</td><td>案件の設定.md に NotebookLM の URL を書く（案件メモの「リンク」欄でもよい）</td></tr>
+      <tr><td>「書ける場所の外です」</td><td>直させてよいフォルダなら、案件の設定.md の「書ける場所」に足す。足したくなければ、そのまま断ってよい</td></tr>
+      <tr><td>「Shift_JIS で書けません」</td><td>Shift_JIS に無い字（一部の漢字・絵文字）が入っている。その字を使わないよう Gemini に頼むか、ファイルを UTF-8 で保存し直す</td></tr>
+      <tr><td>直してほしくなかった</td><td>「編集の履歴」の「元に戻す」。控えは case/_控え/ にもある</td></tr>
+      <tr><td>フォルダを替えられない</td><td>実行中・会議の記録中・質問箱の送信中は替えられない。終わるか「止める」を押してから選ぶ</td></tr>
     </table></div>
-    <h3>動かないとき</h3>
-    <ul>
-      <li>「つながりを確かめる」を押す。「入力欄が見つかりません」なら Gemini の画面の作りが変わっている。設定の「セレクタ」を直す。直すまでは、Gemini の応答をコピーして取り込みタブに貼る従来の使い方ができる</li>
-      <li>1 回の依頼で進むのは 20 手まで（設定で変えられる）。同じ道具が 3 回続けて失敗すると止まる。「止める」でいつでも止められる</li>
-      <li>拡張自体は通信しない。Gemini と NotebookLM の画面に文を入れて、表示された応答を読むだけ。自動で操作してよいかは、社内の規程を確かめてから使う</li>
-    </ul>
   </div>
+
   <div class="fig">
-    <h3>会議・質問箱・監査</h3>
+    <h3 id="h-rule">守ること</h3>
     <ul>
-      <li><b>会議</b>：拡張のときは Meet の字幕（CC をオン）を記録して文字起こしにし、「議事録を作る」で Gemini（議事録 Gem）に送ります。議事録（.md・.docx）・宿題（.xlsx）を <code>資料/議事録/</code> に保存し、決定と未決を案件メモに足します。発言の量はこのツールが数えます。VTT・Teams・Meet の文字起こしのファイルや貼り付けからも作れます。記録してよいか、参加者に先に伝えてください</li>
-      <li><b>質問箱</b>：NotebookLM のチャットの設定に Gem 設定タブの「質問箱の回答の形」を入れておくと、拡張のときは質問を送るだけで回答が状態つきで取り込まれます。新しい質問は自動で入り、既にある質問の回答が変わったときだけ差分を見て選びます。要確認・未確定はまとめて聞き直せます。qa-box.html の控え（JSON）も読み込めます</li>
-      <li><b>監査</b>（拡張）：どこで・誰が・何を・どこまで進めたかを <code>case/audit/</code> に 1 行ずつ残します。本文は入れず、ハッシュでつないでいるので、書き換え・削除は「検証」で分かります。本文は <code>case/会話/</code>（設定でオフにできる）にあり、監査タブから照合できます</li>
-      <li><b>そのほか</b>（拡張）：Gemini の入力欄で <code>/仕様</code> などのあとに Tab で定型文になります。右クリックの「このページを案件の資料に保存」で、見ているページを <code>資料/取り込み/</code> に保存できます。朝の確認の通知と「今日の確認」、Gem の編集画面への指示文の流し込み（保存は人が押す）もあります</li>
-    </ul>
-  </div>
-  <div class="fig">
-    <h3>守ること</h3>
-    <ul>
-      <li>このツールはネットワークに出ません。貼った内容は保存しません（タブを閉じると消えます）</li>
-      <li>案件の資料を Gemini に渡すのは、会社で許可された Gemini（Workspace 版）と NotebookLM だけにする</li>
+      <li>このツールと拡張はネットワークに出ません。Gemini と NotebookLM の画面に文を入れて、表示された応答を読むだけです</li>
+      <li>案件の資料を渡すのは、会社で許可された Gemini（Workspace 版）と NotebookLM だけにする。自動で操作してよいかは社内の規程を確かめる</li>
+      <li>HTML だけで使うとき、貼った内容は保存しません（タブを閉じると消えます）。拡張では案件フォルダにだけ書きます</li>
+      <li>書き込みの許可は、差分を読んでから押す。計画にないファイル（赤の表示）は特に確かめる</li>
     </ul>
   </div>
   </div>
 </section>
 
 </main>
-<div id="toast" role="status" aria-live="polite"></div>
+<div id="toast" aria-hidden="true" title="押すと閉じます"></div>
+<div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+<div id="sr-alert" class="sr-only" role="alert"></div>
 <script>
 /*__AGENT__*/
 </script>

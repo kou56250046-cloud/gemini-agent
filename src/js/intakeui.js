@@ -161,7 +161,7 @@
 
   const STAGES = ["受付", "ヒヤリング", "仕様", "作成", "自己点検", "修正", "仕上げ"];
   function stageBar(hd) {
-    return el("ol", { class: "ik-bar", "aria-label": "段階" }, STAGES.map((s, i) => el("li", { class: i + 1 < hd.stage ? "done" : i + 1 === hd.stage ? "now" : "", text: `${i + 1} ${s}` })));
+    return el("ol", { class: "ik-bar", "aria-label": "段階" }, STAGES.map((s, i) => el("li", { class: i + 1 < hd.stage ? "done" : i + 1 === hd.stage ? "now" : "", "aria-current": i + 1 === hd.stage ? "step" : null, text: `${i + 1} ${s}` }, i + 1 < hd.stage ? el("span", { class: "sr-only", text: "（済）" }) : null)));
   }
 
   function card(b, i) {

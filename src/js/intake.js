@@ -16,6 +16,7 @@
     explain: "解説ページ",
     memo: "案件メモ",
     tool: "ツール呼び出し",
+    plan: "計画",
     code: "コード",
   };
   // 言語名 → 種類
@@ -28,6 +29,7 @@
     wbs: "wbs", arch: "arch", map: "map", explain: "explain",
     memo: "memo",
     tool: "tool",
+    plan: "plan",
   };
   const FENCE = /^[ \t]*(`{3,}|~{3,})[ \t]*([\w-]*)[^\n]*$/;
 
@@ -105,12 +107,12 @@
       const c = line.match(/^[ \t]*(`{3,}|~{3,})[ \t]*$/);
       if (c && c[1][0] === open.mark[0] && c[1].length >= open.mark.length) {
         // 外側が 3 つの囲み（```markdown）で、中に ```flow などがあるときは、中の閉じを外側の閉じと取り違えないようにする
-        if (open.mark.length === 3 && (open.lang === "markdown" || open.lang === "md") && open.nested) { open.nested = false; open.body.push(line); continue; }
+        if (open.mark.length === 3 && (open.lang === "markdown" || open.lang === "md" || open.lang === "plan") && open.nested) { open.nested = false; open.body.push(line); continue; }
         push(open);
         open = null;
         continue;
       }
-      if ((open.lang === "markdown" || open.lang === "md") && open.mark.length === 3 && /^[ \t]*```[ \t]*[\w-]+/.test(line)) open.nested = true;
+      if ((open.lang === "markdown" || open.lang === "md" || open.lang === "plan") && open.mark.length === 3 && /^[ \t]*```[ \t]*[\w-]+/.test(line)) open.nested = true;
       open.body.push(line);
     }
     // 閉じていないブロック（応答が途中で切れた）も拾う。truncated で知らせる

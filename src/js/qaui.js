@@ -76,8 +76,9 @@
   // ---------- NotebookLM に送る（拡張） ----------
   async function sendToNlm(parts, label) {
     const ag = A();
-    const tab = await ag.findTab("notebooklm");
-    if (!tab) { say("NotebookLM のノートブックを開いたタブがありません", "err"); return null; }
+    let tab = null;
+    try { tab = await ag.findCaseTab("notebooklm"); } catch (e) { say(e.message, "err"); return null; }
+    if (!tab) { say("NotebookLM のノートブックを開いたタブがありません（案件の設定.md に URL を書くと、自動で開きます）", "err"); return null; }
     // sent：最後の通まで送って取り込めたか（入力欄を消してよいかの判断に使う）
     const res = { added: [], updates: 0, bad: 0, sent: false };
     ag.hold("qa", true); // 送っている間は案件フォルダを替えさせない

@@ -21,6 +21,13 @@ gemini-kit（案件カルテ・要件定義書づくり）とは別のプロジ�
 - 弾2 構成図・論点マップ・WBS・解説ページ・Excel/VBA・案件メモ：`.claude/specs/new-artifacts/requirements.md`
 - 弾3 Chrome 拡張（エージェント）：`.claude/specs/agent-extension/requirements.md`
 - 弾4 監査ログ・質問箱・会議（Meet 字幕 → 議事録）・会話アーカイブ・スラッシュコマンド・Gem 更新・朝の確認・ページ取り込み：`.claude/specs/audit-and-tools/requirements.md`
+- 案件ごとのリンク（案件フォルダ直下の `案件の設定.md` から NotebookLM・司令塔 Gem・レビュー Gem の URL を読む）：`.claude/specs/case-links.md`
+  - 送り先のタブは `findCaseTab` で選ぶ（`findTab` を直接使うのは Meet・Gem の編集画面・つながりの確認だけ）
+  - 監査ログに URL を入れない（読み込みは件数と sha256、登録は種類だけ）
+- 弾5 計画モード・選択肢つきの提案・ファイルの編集（edit_file / edit_xlsx / edit_docx）・書ける場所・検索の強化・横断調査：`.claude/specs/plan-and-edit.md`
+  - 計画モードは拡張が守る（execTool で WRITE_TOOLS を拒む）。Gemini の約束事に頼らない
+  - 書く道具は、out/ の新規ファイル（confirmWrite に従う）以外、必ず差分を見せて人の許可を取る。控えは case/_控え/、記録は case/編集履歴.jsonl
+  - 書ける場所は runner.writablePath(p, areas) だけで決める。case/・_控え・案件の設定.md は書かない
 
 ## 弾4 の決まり
 - 監査ログ（`case/audit/YYYY-MM.jsonl`）
@@ -47,7 +54,7 @@ gemini-kit（案件カルテ・要件定義書づくり）とは別のプロジ�
   - HTML：開いていたタブだけ（sessionStorage）。貼った内容は保存しない
   - 拡張：設定・セレクタ・案件フォルダの場所だけ。案件の中身は、ユーザーが選んだ案件フォルダ（case/・out/）にだけ書く
   - 実行ログ：本文を入れない
-- 拡張が書けるのは案件フォルダの `out/` と `case/` だけ（write_file は `out/` だけ）。`..`・絶対パスは拒む
+- 拡張が書けるのは案件フォルダの `out/` と `case/`、`資料/`（議事録・取り込み）と直下の `案件の設定.md`（人がパネルで入れたリンクの書き戻し）だけ。Gemini の道具（write_file・edit_*）が書けるのは `out/` と、人が案件の設定.md の「書ける場所」に足したフォルダだけ。`..`・絶対パスは拒む
 - フォントは英数字 Arial、日本語メイリオ。例外は「Google スライド向けに保存」で、日本語を Noto Sans JP にする（Google スライドにメイリオが無い）
 - Claude 側の確認はダミー（`tests/fixtures/`、各タブのサンプル、ダミーの Gemini 画面）だけで行う。実際の Gemini には触らない
 
@@ -64,6 +71,8 @@ src/js/map.js         論点マップ・選択肢の木（```map）：字下げ�
 src/js/wbs.js         WBS：日程（営業日）・余裕・クリティカルパス・ガント図 SVG・xlsx の行
 src/js/explain.js     解説ページ（```explain の JSON）→ 単体の HTML（結論 → 全体像 → 詳細 → 次の一手）
 src/js/note.js        案件メモ（```memo の F/D/Q）の統合と、status.md・index.md・NotebookLM 用 md
+src/js/caseconf.js    案件の設定.md の読み取り・URL の確かめ・1 項目の書き戻し・タブとの照合。DOM 非依存
+src/js/edit.js        編集：部分の置き換え・文字コードの書き戻し（UTF-8／Shift_JIS）・差分の塊・xlsx のセルの値・docx の文の置き換え。DOM 非依存
 src/js/runner.js      エージェントの進め方（道具の使い方の文・```tool の読み取り・次の一手・パス・結果の文・安全装置・ログ）。DOM 非依存
 src/js/preview.js     スライドのプレビュー（gemini-kit の app.js の写し）
 src/js/intakeui.js    取り込みタブと出口のボタン

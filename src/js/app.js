@@ -10,13 +10,24 @@
   const safe = (s, def) => String(s || def).replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
   const debounce = (fn, ms) => { let t = null; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
 
+  // 通知。読み切れるよう文字数に比例して出し（最短 3 秒・エラーは 7 秒）、マウスを乗せている間は消さない。押すと閉じる。
+  // 読み上げは見た目の通知とは別の live 領域に出す（role を書き換えると読まれないことがあるため）
   function toast(msg, kind) {
     const t = $("#toast");
     t.textContent = msg;
     t.className = "show " + (kind || "");
-    t.setAttribute("role", kind === "err" ? "alert" : "status");
-    clearTimeout(toast.timer);
-    toast.timer = setTimeout(() => (t.className = ""), kind === "err" ? 7000 : 2600);
+    const sr = $(kind === "err" ? "#sr-alert" : "#sr-status");
+    if (sr) { sr.textContent = ""; sr.textContent = msg; }
+    toast.ms = Math.min(20000, Math.max(kind === "err" ? 7000 : 3000, String(msg).length * 120));
+    toast.arm();
+  }
+  toast.arm = () => { clearTimeout(toast.timer); toast.timer = setTimeout(() => ($("#toast").className = ""), toast.ms || 3000); };
+  function initToast() {
+    const t = $("#toast");
+    if (!t) return;
+    t.addEventListener("mouseenter", () => clearTimeout(toast.timer));
+    t.addEventListener("mouseleave", () => { if (t.classList.contains("show")) toast.arm(); });
+    t.addEventListener("click", () => { clearTimeout(toast.timer); t.className = ""; });
   }
   async function copyText(s, note) {
     const ok = await GK.dom.copyText(s);
@@ -53,8 +64,12 @@
     tabs.forEach((b, i) => {
       b.addEventListener("click", () => show(b.dataset.tab));
       b.addEventListener("keydown", (e) => {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        const live = tabs.filter((x) => x.isConnected);
+        const j = live.indexOf(b);
+        const to = { ArrowRight: j + 1, ArrowLeft: j - 1 + live.length, Home: 0, End: live.length - 1 }[e.key];
+        if (to == null) return;
+        e.preventDefault();
+        const next = live[to % live.length];
         show(next.dataset.tab);
         next.focus();
       });
@@ -386,6 +401,7 @@
     GK.qaUI.init(tabCtx);
     if (GK.auditUI) GK.auditUI.init(tabCtx);
     initDownloads();
+    initToast();
     initTabs();
   }
   GK.app = { start, HELP_FLOW };

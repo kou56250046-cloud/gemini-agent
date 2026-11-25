@@ -14,9 +14,9 @@ export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(ROOT, "src");
 const MARK = "/*__AGENT__*/";
 // 読み込み順。intakeui.js と app.js は最後（ほかのモジュールを使う）
-export const JS_FILES = ["dom.js", "md.js", "flow.js", "slides.js", "pptx.js", "xlsx.js", "intake.js", "gexport.js", "diagram.js", "arch.js", "map.js", "wbs.js", "explain.js", "note.js", "runner.js", "parse.js", "model.js", "audit.js", "clean.js", "meetlog.js", "minutes.js", "qaflow.js", "preview.js", "intakeui.js", "runnerui.js", "qaui.js", "meetui.js", "auditui.js", "app.js"];
+export const JS_FILES = ["dom.js", "md.js", "flow.js", "slides.js", "pptx.js", "xlsx.js", "intake.js", "gexport.js", "diagram.js", "arch.js", "map.js", "wbs.js", "explain.js", "note.js", "caseconf.js", "edit.js", "runner.js", "parse.js", "model.js", "audit.js", "clean.js", "meetlog.js", "minutes.js", "qaflow.js", "preview.js", "intakeui.js", "runnerui.js", "qaui.js", "meetui.js", "auditui.js", "app.js"];
 // 画面を使わないモジュール（テストで読む）
-export const LOGIC_FILES = ["dom.js", "md.js", "flow.js", "slides.js", "pptx.js", "xlsx.js", "intake.js", "gexport.js", "diagram.js", "arch.js", "map.js", "wbs.js", "explain.js", "note.js", "runner.js", "parse.js", "model.js", "audit.js", "clean.js", "meetlog.js", "minutes.js", "qaflow.js"];
+export const LOGIC_FILES = ["dom.js", "md.js", "flow.js", "slides.js", "pptx.js", "xlsx.js", "intake.js", "gexport.js", "diagram.js", "arch.js", "map.js", "wbs.js", "explain.js", "note.js", "caseconf.js", "edit.js", "runner.js", "parse.js", "model.js", "audit.js", "clean.js", "meetlog.js", "minutes.js", "qaflow.js"];
 // Gem 設定タブでの並び
 export const CATEGORIES = ["Gem 指示文", "NotebookLM 指示", "図・スライドの書式", "Excel・VBA", "デザイン（PPT）"];
 const splitList = (s) => String(s || "").split(/[,、]\s*/).map((x) => x.trim()).filter(Boolean);
