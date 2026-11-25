@@ -472,7 +472,9 @@
       for (const x of await S.fs.list(segs)) {
         if (files >= FILES) return;
         const p = [...segs, x.name];
-        if (x.dir) { if (x.name !== "_控え") await walk(p); continue; }
+        // case/（拡張の記録：会話の控え・監査ログ・計画）は、path で case/ を指したときだけ探す。
+        // 一番上から探すと、前の会話の文が結果に混ざり、Gemini が自分の過去の指示を資料として読んでしまうため
+        if (x.dir) { if (x.name !== "_控え" && !(segs.length === 0 && x.name === "case")) await walk(p); continue; }
         const ext = (x.name.match(/\.([^.]+)$/) || [])[1];
         if (exts && !exts.includes(String(ext).toLowerCase())) continue;
         const office = /\.(docx|xlsx|xlsm)$/i.test(x.name);

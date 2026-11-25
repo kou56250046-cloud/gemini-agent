@@ -321,6 +321,7 @@ try {
     window.__p = T.run("【試験：計画】締め日を直す（ダミー）");
     const ok = await wait(".ag-plan");
     return { ok, card: !!document.querySelector(".ag-plan"), files: (document.querySelector(".ag-plan p.small:nth-of-type(2)") || {}).textContent || "", rejected: T.state.log.some((e) => e.tool === "write_file" && e.ok === false), planSaved: [...T.state.fs.files.keys()].filter((k) => k.startsWith("case/計画/")) };`);
+  console.error("＝plan1", JSON.stringify(result.plan1).slice(0, 1500));
   await panel.shot("ext-plan.png");
   console.error("…plan2");
   result.plan2 = await panel.ev(`
@@ -334,6 +335,8 @@ try {
     await wait(".ag-approve .ag-diff");
     const diff = [...document.querySelectorAll(".ag-approve .ag-diff > div")].map((d) => d.className + ":" + d.textContent);
     return { revised, mode: T.state.settings.mode, planFiles: T.state.planFiles, diff, warn: !!document.querySelector(".ag-approve p.err") };`);
+  console.error("＝plan2", JSON.stringify(result.plan2).slice(0, 1500));
+  console.error("＝sent2", JSON.stringify(await gem.ev(`return window.__sent.slice(-4).map((t) => t.slice(0, 120));`)));
   await panel.shot("ext-diff.png");
   console.error("…plan3");
   result.plan3 = await panel.ev(`
@@ -342,12 +345,15 @@ try {
     document.querySelector(".ag-approve button.primary").click();
     await wait(".ag-opts");
     return { opts: [...document.querySelectorAll(".ag-opt")].map((b) => b.textContent), rec: (document.querySelector(".ag-opt.rec b") || {}).textContent };`);
+  console.error("＝plan3", JSON.stringify(result.plan3).slice(0, 1500));
   await panel.shot("ext-options.png");
   console.error("…plan4");
   result.plan4 = await panel.ev(`
     const T = GK.runnerUI.test;
     ${waitGate}
-    document.querySelector(".ag-opt").click();
+    const opt = document.querySelector(".ag-opt");
+    if (!opt) return { noOptions: true, gate: (document.querySelector(".ag-gate") || {}).innerText, log: T.state.log.slice(-6).map((e) => e.action + " " + (e.tool || "") + (e.ok === false ? " 失敗" : "")) };
+    opt.click();
     await new Promise((r) => setTimeout(r, 300));
     const warns = [];
     for (let i = 0; i < 3; i++) {
@@ -376,6 +382,7 @@ try {
     const sent = await (async () => { const tabs = await chrome.tabs.query({}); return tabs.length; })();
     return { warns, msg: document.querySelector("#agent-root .status").textContent, aEnc: a.enc, aEol: a.eol === "\\r\\n", aText: a.text.includes("締め日は月末"), sheet, docText: docText.includes("締め日は月末です"), researchFooter: research.includes("## 調べたファイル（gemini-agent が記録）") && research.includes("資料/仕様/a.md"), plans, hist, outsideFail, minutesKept: minutes === "締め日は未定",
       undone: undone.enc === "sjis" && undone.text.includes("締め日は未定"), backups: [...F.keys()].filter((k) => k.startsWith("case/_控え/")).length, auditNoBody: !auditText.includes("締め日は未定") && !auditText.includes("確かめ方も足して"), auditPlan: ["計画の提出", "計画の差し戻し", "計画の承認", "元に戻す"].every((x) => auditText.includes(x)), editsUi: document.querySelectorAll("#agent-root .ag-edits li").length };`);
+  console.error("＝plan4", JSON.stringify(result.plan4).slice(0, 1500));
   await panel.ev(`document.querySelector("#agent-root .ag-edits-box").open = true; document.querySelector("#agent-root .ag-edits-box").scrollIntoView(); return 1;`);
   await panel.shot("ext-edits.png");
   console.error("…sentPlan");

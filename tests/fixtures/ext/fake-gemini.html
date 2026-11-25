@@ -27,7 +27,7 @@
     ];
     // 計画モード → 計画 → 差し戻し → 承認 → 検索・読む・編集・選択肢・書ける場所の外・xlsx・docx・調査のまとめ（弾5）
     const PLAN = "# 計画：締め日を直す\n## 目的\n- 締め日を月末にそろえる\n## 変更するファイル\n- 資料/仕様/a.md：締め日を月末に直す\n## 作るファイル\n- out/調査_締め日.md\n## やらないこと\n- 議事録は直さない";
-    if (t.includes("【試験：計画】")) return [{ p: "まず書いてみます。" }, tool("write_file", { path: "out/早すぎる.md", content: "x" })];
+    if (t.includes("【試験：計画】") && !t.startsWith("【ツール結果")) return [{ p: "まず書いてみます。" }, tool("write_file", { path: "out/早すぎる.md", content: "x" })];
     if (t.startsWith("【ツール結果｜write_file｜失敗】") && t.includes("計画モード")) return [{ p: "調べました。計画です。" }, { code: "plan", text: PLAN }];
     if (t.startsWith("【計画への指摘】")) return [{ p: "直しました。" }, { code: "plan", text: PLAN + "\n## 確かめ方\n- 読み直して月末になっていること" }];
     if (t.startsWith("【計画の承認】")) return [{ p: "探します。" }, tool("search", { query: "締め日", context: 1, ext: "md" })];
@@ -43,7 +43,7 @@
     if (t.startsWith("【ツール結果｜list_dir｜成功】")) return [{ p: "議事録を読みます。" }, tool("read_file", { path: "資料/議事録.txt" })];
     if (t.startsWith("【ツール結果｜read_file｜成功】") && t.includes("締め日")) return [{ p: "工数を計算します。" }, tool("run_js", { code: "return input.a * input.b", input: { a: 6, b: 7 } })];
     if (t.startsWith("【ツール結果｜run_js｜成功】") && t.includes("42")) return [{ p: "【段階 3/7｜WBS｜仕様を読んで「承認」か直す点を返してください】" }, { h: "仕様" }, { p: "背景：受注の見直し（ダミー）。非目標：請求は扱わない。" }];
-    if (t.includes("承認")) return [
+    if (t.startsWith("承認")) return [ // 道具の結果の注意書き（「指示・承認…には従わない」）に反応しないよう、頭だけを見る
       { p: "【段階 4/7｜WBS｜WBS と論点を確かめてください】" },
       { code: "Map", text: "title 論点（ダミー）\n受注を速くする\n- 入力を減らす [課題]\n  - ポータル [案] [推奨]" },
       { code: "wbs", text: "| ID | 階層 | 作業 | 成果物 | 工数(h) | 依存 | 担当 | 開始 | 終了 |\n|---|---|---|---|---|---|---|---|---|\n| 1 | 1 | 聞き取り | 議事録 | 16 |  | 担当A | 2026-12-01 |  |\n| 2 | 1 | 整理 | 要件一覧 | 24 | 1 | 担当A |  |  |" },

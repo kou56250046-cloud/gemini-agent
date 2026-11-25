@@ -3853,7 +3853,7 @@ ${d.notes.length ? `<ul class="notes">${d.notes.map((n) => `<li>${inline(n)}</li
   const TOOLS = {
     list_dir: { args: ["path?"], text: "案件フォルダの中の一覧（path を省くと一番上）" },
     read_file: { args: ["path", "from?"], text: "ファイルを読む（txt・md・csv・json・xlsx・docx・ソースコードなど）。長いときは from（文字の位置）で続きを読む" },
-    search: { args: ["query", "path?", "regex?", "ext?", "context?", "office?"], text: "案件フォルダの中を横断して探す。regex: true で正規表現、ext: \"md,js\" で種類を絞る、context: 前後の行数（3 まで）、office: true で docx・xlsx の中も探す。多すぎるとファイルごとの件数だけを返す" },
+    search: { args: ["query", "path?", "regex?", "ext?", "context?", "office?"], text: "案件フォルダの中を横断して探す。regex: true で正規表現、ext: \"md,js\" で種類を絞る、context: 前後の行数（3 まで）、office: true で docx・xlsx の中も探す。case/（拡張の記録）は path で指したときだけ。多すぎるとファイルごとの件数だけを返す" },
     write_file: { args: ["path", "content"], text: "ファイルを新しく書く・まるごと書き直す（out/ と、案件の設定.md の「書ける場所」の中だけ）。書く前に人の許可を取り、上書きの前に控えを残す" },
     edit_file: { args: ["path", "old", "new", "all?"], text: "テキストのファイルの一部を置き換える。old はファイルの文をそのまま写す（1 か所に決まるように）。差分を人が見て許可する。文字コード・改行は元のまま" },
     edit_xlsx: { args: ["path", "cells", "sheet?", "overwrite_formula?"], text: "xlsx のセルの値を書き換える（cells: {\"B3\": \"月末\", \"C4\": 12}）。書式・数式・グラフは変えない。数式のセルは overwrite_formula: true のときだけ" },
@@ -6094,7 +6094,9 @@ ${d.notes.length ? `<ul class="notes">${d.notes.map((n) => `<li>${inline(n)}</li
       for (const x of await S.fs.list(segs)) {
         if (files >= FILES) return;
         const p = [...segs, x.name];
-        if (x.dir) { if (x.name !== "_控え") await walk(p); continue; }
+        // case/（拡張の記録：会話の控え・監査ログ・計画）は、path で case/ を指したときだけ探す。
+        // 一番上から探すと、前の会話の文が結果に混ざり、Gemini が自分の過去の指示を資料として読んでしまうため
+        if (x.dir) { if (x.name !== "_控え" && !(segs.length === 0 && x.name === "case")) await walk(p); continue; }
         const ext = (x.name.match(/\.([^.]+)$/) || [])[1];
         if (exts && !exts.includes(String(ext).toLowerCase())) continue;
         const office = /\.(docx|xlsx|xlsm)$/i.test(x.name);
