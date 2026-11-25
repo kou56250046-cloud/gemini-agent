@@ -7,7 +7,7 @@
 - 文書・WBS・解説ページ・スライド・表
 
 配るものは 2 つ。
-- `output/gemini-agent.html`（1 枚。コピー＆ペーストで使う。右上のボタンで、この HTML と拡張の zip（埋め込み）を保存できる。公開は https://kou56250046-cloud.github.io/gemini-agent/ 。gh-pages ブランチ）
+- `output/gemini-agent.html`（1 枚。コピー＆ペーストで使う。右上のボタンで、この HTML と拡張の zip（埋め込み）を保存できる。公開は https://kou56250046-cloud.github.io/gemini-agent/ 。main の docs/index.html。output/gemini-agent.html は git に入れない）
 - `output/extension/`（Chrome 拡張。サイドパネルに同じ画面と「エージェント」タブが出て、Gemini の画面を操作して自動で進める）
 
 gemini-kit（案件カルテ・要件定義書づくり）とは別のプロジェクト。
@@ -102,7 +102,7 @@ tools/fix-bom.mjs     見えない文字（U+FEFF・U+2028・U+2029）をエス�
 ```bash
 node build.mjs                    # output/gemini-agent.html と output/extension/
 node --test tests/*.test.mjs        # テスト（agent・artifacts・runner・qa・meeting）
-node tools/publish.mjs            # 公開用フォルダ ../gemini-agent-pages（GitHub Pages）へ HTML だけを写す。そのフォルダでコミットし、このリポジトリの gh-pages ブランチへ push する
+node tools/publish.mjs            # docs/index.html（GitHub Pages：main の /docs）へ HTML だけを写す。main をコミットして push すれば公開される
 node tools/ext-smoke.mjs          # 拡張の通し試験（Playwright の Chromium を使う。Google Chrome 137 以降は --load-extension を受け付けない）
 python -m http.server 8772 --bind 127.0.0.1   # output で実行。画面確認用（Playwright は file:// を開けない）
 ```

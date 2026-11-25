@@ -12,7 +12,7 @@ Gemini（Gem）と NotebookLM しか使えない環境で、Claude Code のよ�
 
 | ファイル | 使い方 |
 |---|---|
-| `output/gemini-agent.html` | ダブルクリックで開く。Gem の応答を「取り込み」タブに貼る |
+| `docs/index.html` | https://kou56250046-cloud.github.io/gemini-agent/ で開ける（右上のボタンで、この HTML と拡張の zip を保存できる）。手元で作ると `output/gemini-agent.html` |
 | `output/extension/` | Chrome 拡張。サイドパネルの「エージェント」タブが Gemini の画面を操作して、送信・回収・道具の実行・保存を自動で行う |
 
 ### 拡張の入れ方
@@ -30,6 +30,7 @@ Node は組み立てとテストにだけ使います（npm パッケージは�
 node build.mjs                    # output/gemini-agent.html と output/extension/
 node --test tests/agent.test.mjs tests/artifacts.test.mjs tests/runner.test.mjs
 node tools/ext-smoke.mjs          # 拡張の通し試験（Playwright の Chromium を使う）
+node tools/publish.mjs            # docs/index.html に写す（main を push すると公開される）
 ```
 
 構成と決まりは `.claude/CLAUDE.md`、仕様は `.claude/specs/` にあります。

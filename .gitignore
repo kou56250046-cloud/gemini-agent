@@ -1,4 +1,6 @@
-# 配布物（output/gemini-agent.html・output/extension/）は入れる。確認用の画像と試験版の拡張は入れない
+# 配布物の拡張（output/extension/）は入れる。HTML は公開用の docs/index.html だけを入れる（同じ HTML を 2 つ入れると履歴が重くなる）
+output/gemini-agent.html
+output/smoke.*
 output/shots/
 output/extension-test/
 output/*.tmp
