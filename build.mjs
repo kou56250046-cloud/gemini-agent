@@ -161,7 +161,7 @@ export function zipDir(dir, top) {
 
 // ---------- Chrome 拡張（デベロッパーモードで「パッケージ化されていない拡張機能を読み込む」） ----------
 export const EXT_FILES = ["background.js", "domtomd.js", "content-gemini.js", "content-nlm.js", "content-meet.js", "sandbox.html", "sandbox.js"];
-const HOSTS = { gemini: ["https://gemini.google.com/"], notebooklm: ["https://notebooklm.google.com/"], meet: ["https://meet.google.com/"] };
+const HOSTS = { gemini: ["https://gemini.google.com/"], notebooklm: ["https://notebooklm.google.com/", "https://notebook.google.com/"], meet: ["https://meet.google.com/"] };
 // 試験版は、ダミーの画面（tests/fixtures/ext）を配る 127.0.0.1 も相手にする
 function hostsOf(o) {
   const h = { gemini: [...HOSTS.gemini], notebooklm: [...HOSTS.notebooklm], meet: [...HOSTS.meet] };

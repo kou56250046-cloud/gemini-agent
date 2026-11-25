@@ -36,7 +36,8 @@
     const u = String(url || "");
     if (!/^https?:\/\//.test(u) || /\s/.test(u)) return false;
     if (!(hosts[kind] || []).some((h) => u.startsWith(h))) return false;
-    if (kind === "notebooklm" && u.startsWith("https://notebooklm.google.com/") && !/^https:\/\/notebooklm\.google\.com\/notebook\/[^/?#]+/.test(u)) return false;
+    // 本物の NotebookLM は notebooklm.google.com と notebook.google.com の 2 つ
+    if (kind === "notebooklm" && /^https:\/\/notebook(lm)?\.google\.com\//.test(u) && !/^https:\/\/notebook(lm)?\.google\.com\/notebook\/[^/?#]+/.test(u)) return false;
     return true;
   }
   // → { ok: {key: url}, errors: [{key, line, msg}] }。空欄は「未登録」で、誤りにしない
@@ -73,7 +74,7 @@
     "# 案件の設定",
     "",
     "gemini-agent（Chrome 拡張）がこのファイルを読みます。URL を書き換えたら、次に送るときに読み直します。",
-    "NotebookLM はこの案件のノートブックの URL（https://notebooklm.google.com/notebook/…）、Gem は Gem を開いたときの URL を書きます。",
+    "NotebookLM はこの案件のノートブックを開いたときの URL（https://notebooklm.google.com/notebook/… など）、Gem は Gem を開いたときの URL を書きます。",
     "書ける場所は、Gemini にファイルを直させてよいフォルダです（例：資料/仕様, src）。out/ はいつでも書けます。書く前には毎回、差分を見て許可します。",
     "",
     ...KEYS.map((k) => `${k.label}: `.trimEnd()),

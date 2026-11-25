@@ -15,6 +15,7 @@
   "host_permissions": [
     "https://gemini.google.com/*",
     "https://notebooklm.google.com/*",
+    "https://notebook.google.com/*",
     "https://meet.google.com/*"
   ],
   "side_panel": {
@@ -45,7 +46,8 @@
     },
     {
       "matches": [
-        "https://notebooklm.google.com/*"
+        "https://notebooklm.google.com/*",
+        "https://notebook.google.com/*"
       ],
       "js": [
         "domtomd.js",

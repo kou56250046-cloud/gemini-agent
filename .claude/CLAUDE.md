@@ -49,7 +49,7 @@ gemini-kit（案件カルテ・要件定義書づくり）とは別のプロジ�
 - 依存ゼロ。docx・xlsx・pptx（無圧縮 zip + XML）、図、Markdown 表示はすべて自前。npm パッケージを入れない
 - `file://` で開ける。DOM は `createElement` / `textContent`。innerHTML を使わない。SVG は自前で作った文字列を DOMParser で入れる
 - LLM はこのツールの中では使わない。Gemini API・Apps Script・Google API・ネイティブメッセージングも使わない
-- 拡張は Gemini・NotebookLM の画面に文を入れて、表示された応答を読むだけ。権限は sidePanel・storage・scripting と、その 2 つのホストだけ
+- 拡張は Gemini・NotebookLM の画面に文を入れて、表示された応答を読むだけ。権限は sidePanel・storage・scripting と、その 2 つのホストだけ（NotebookLM は notebooklm.google.com と notebook.google.com の 2 つのドメイン）
 - 保存してよいもの：
   - HTML：開いていたタブだけ（sessionStorage）。貼った内容は保存しない
   - 拡張：設定・セレクタ・案件フォルダの場所だけ。案件の中身は、ユーザーが選んだ案件フォルダ（case/・out/）にだけ書く

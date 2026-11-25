@@ -183,6 +183,6 @@ test("質問箱：新しい質問は自動で入り、更新は保留して選�
 test("拡張：弾4 で足した権限と host は計画どおりだけ", () => {
   const m = manifest();
   assert.deepEqual(m.permissions, ["sidePanel", "storage", "scripting", "alarms", "notifications", "contextMenus", "activeTab"]);
-  assert.deepEqual(m.host_permissions, ["https://gemini.google.com/*", "https://notebooklm.google.com/*", "https://meet.google.com/*"]);
+  assert.deepEqual(m.host_permissions, ["https://gemini.google.com/*", "https://notebooklm.google.com/*", "https://notebook.google.com/*", "https://meet.google.com/*"]);
   assert.match(m.content_security_policy.extension_pages, /connect-src 'none'/);
 });

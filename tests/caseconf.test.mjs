@@ -5,7 +5,7 @@ import { loadGK } from "../build.mjs";
 
 const GK = loadGK();
 const C = GK.caseconf;
-const HOSTS = { gemini: ["https://gemini.google.com/"], notebooklm: ["https://notebooklm.google.com/"], meet: ["https://meet.google.com/"] };
+const HOSTS = { gemini: ["https://gemini.google.com/"], notebooklm: ["https://notebooklm.google.com/", "https://notebook.google.com/"], meet: ["https://meet.google.com/"] };
 
 test("案件の設定：区切りの揺れ・行頭の記号・飾り・知らない行", () => {
   const p = C.parse([
@@ -33,6 +33,10 @@ test("案件の設定：別のサイトや NotebookLM のトップは使わな�
   assert.match(r.errors[0].msg, /1 行目.*NotebookLM のノートブック/);
   assert.match(r.errors[1].msg, /2 行目.*Gemini/);
   assert.equal(C.valid("notebooklm", "https://notebooklm.google.com/notebook/abc?authuser=1", HOSTS), true);
+  // notebook.google.com も NotebookLM（ノートブックの URL に限る）
+  assert.equal(C.valid("notebooklm", "https://notebook.google.com/notebook/90d044ed-e3e9-4265-937c-b84ce2f34e07", HOSTS), true);
+  assert.equal(C.valid("notebooklm", "https://notebook.google.com/", HOSTS), false);
+  assert.equal(C.valid("notebooklm", "https://notebook.example.com/notebook/abc", HOSTS), false);
   assert.equal(C.valid("gemini", "https://gemini.google.com/gem/a b", HOSTS), false);
   assert.equal(C.valid("gemini", "javascript:alert(1)", HOSTS), false);
 });

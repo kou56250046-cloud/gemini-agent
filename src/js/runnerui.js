@@ -9,7 +9,7 @@
   const el = (...a) => GK.dom.el(...a);
   const clear = (n) => { while (n.firstChild) n.removeChild(n.firstChild); return n; };
   const R = GK.runner;
-  const HOSTS = () => GK.EXT_HOSTS || { gemini: ["https://gemini.google.com/"], notebooklm: ["https://notebooklm.google.com/"], meet: ["https://meet.google.com/"] };
+  const HOSTS = () => GK.EXT_HOSTS || { gemini: ["https://gemini.google.com/"], notebooklm: ["https://notebooklm.google.com/", "https://notebook.google.com/"], meet: ["https://meet.google.com/"] };
   const today = () => { const d = new Date(); const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
   const nowText = () => { const d = new Date(); const p = (n) => String(n).padStart(2, "0"); return `${today()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
   const enc = new TextEncoder();
@@ -221,7 +221,7 @@
     const k = GK.caseconf.KEYS.find((x) => x.key === key);
     const u = String(url || "").trim();
     if (!k.kind && u && !R.areasOf(u).length) { ctx.toast("書ける場所は、案件フォルダの中のフォルダをカンマ区切りで書きます（例：資料/仕様, src）。case・out・.. は書けません", "err"); return false; }
-    if (k.kind && u && !GK.caseconf.valid(k.kind, u, HOSTS())) { ctx.toast(`${k.label} の URL ではありません（${k.kind === "notebooklm" ? "https://notebooklm.google.com/notebook/…" : "https://gemini.google.com/…"}）`, "err"); return false; }
+    if (k.kind && u && !GK.caseconf.valid(k.kind, u, HOSTS())) { ctx.toast(`${k.label} の URL ではありません（${k.kind === "notebooklm" ? "ノートブックを開いたときの …google.com/notebook/… の URL" : "https://gemini.google.com/…"}）`, "err"); return false; }
     const cur = (await S.fs.exists(CONF())) ? decodeText(await S.fs.read(CONF())) : GK.caseconf.template();
     await S.fs.write(CONF(), GK.caseconf.update(cur, key, u));
     await audit({ actor: "人", action: "リンクの登録", target: key, result: u ? "成功" : "空欄" });
@@ -244,7 +244,7 @@
     if (!S.conf.exists) UI.links.append(el("p", { class: "small" }, `${GK.caseconf.FILE} はまだありません。`, el("button", { type: "button", class: "linklike", text: "ひな形を作る", onclick: createConf }), "（下の欄に入れても作られます）"));
     for (const k of GK.caseconf.KEYS) {
       const dflt = linkOf(k.key) && !S.conf.links[k.key] ? "（未登録：設定の値を使います）" : "";
-      const ph = !k.kind ? "例：資料/仕様, src（out/ はいつでも書けます）" : k.kind === "notebooklm" ? `https://notebooklm.google.com/notebook/…${dflt}` : `https://gemini.google.com/gem/…${dflt}`;
+      const ph = !k.kind ? "例：資料/仕様, src（out/ はいつでも書けます）" : k.kind === "notebooklm" ? `https://notebooklm.google.com/notebook/…（ノートブックを開いたときの URL）${dflt}` : `https://gemini.google.com/gem/…${dflt}`;
       const inp = el("input", { type: k.kind ? "url" : "text", value: S.conf.links[k.key] || "", placeholder: ph, "aria-label": k.kind ? `${k.label} の URL` : k.label, spellcheck: "false" });
       inp.addEventListener("change", () => saveLink(k.key, inp.value));
       UI.links.append(el("label", { class: "ag-set" }, el("span", { text: k.kind ? k.label : `${k.label}（Gemini にファイルを直させてよいフォルダ）` }), inp));
@@ -1030,11 +1030,11 @@
     const inp = (k, label, type) => { const i = el("input", { type: type || "text", value: s[k] ?? "", "aria-label": label }); if (type === "checkbox") i.checked = !!s[k]; i.addEventListener("change", async () => { s[k] = type === "checkbox" ? i.checked : type === "number" ? Math.max(1, Math.min(60, +i.value || 20)) : i.value.trim(); await store.set("settings", s); }); return el("label", { class: "ag-set" }, el("span", { text: label }), i); };
     // NotebookLM の URL：全案件共通。案件を替えたら入れ替える（案件の設定.md に書いてあれば、そちらが先）
     const nlmInp = () => {
-      const label = "NotebookLM の URL（https://notebooklm.google.com/notebook/…。案件を替えたら入れ替える）";
+      const label = "NotebookLM の URL（ノートブックを開いたときの …/notebook/… の URL。案件を替えたら入れ替える）";
       const i = el("input", { type: "url", value: s.notebookUrl || "", "aria-label": label, spellcheck: "false" });
       i.addEventListener("change", async () => {
         const u = i.value.trim();
-        if (u && !GK.caseconf.valid("notebooklm", u, HOSTS())) { ctx.toast("NotebookLM のノートブックの URL ではありません（https://notebooklm.google.com/notebook/…）", "err"); i.value = s.notebookUrl || ""; return; }
+        if (u && !GK.caseconf.valid("notebooklm", u, HOSTS())) { ctx.toast("NotebookLM のノートブックの URL ではありません（ノートブックを開いたときの …google.com/notebook/… の URL を貼ってください）", "err"); i.value = s.notebookUrl || ""; return; }
         s.notebookUrl = u; await store.set("settings", s); renderLinks();
         ctx.toast(u ? "NotebookLM の URL を設定しました" : "NotebookLM の URL を空にしました");
       });
